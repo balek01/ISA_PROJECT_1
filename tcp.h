@@ -65,7 +65,7 @@ int CreateSocket();
  *  @param conn Conn structure containig connection information
  *  
  */
-void BindSocket(int server_socket, Conn conn);
+void BindSocket( Conn conn);
 
 /**
  * Listen for incoming connections
@@ -74,7 +74,7 @@ void BindSocket(int server_socket, Conn conn);
  *  @param conn Conn structure containig connection information
  *  
  */
-void Listen(int server_socket, Conn conn);
+void Listen(Conn conn);
 
 /**
  * Accept connection from client
@@ -84,7 +84,7 @@ void Listen(int server_socket, Conn conn);
  *  @param conn Conn structure containig connection information
  *  
  */
-void Accept(int server_socket);
+void Accept();
 
 
 

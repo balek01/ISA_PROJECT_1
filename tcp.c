@@ -8,7 +8,8 @@
  *
  *
  *  Last modified: Oct 3, 2023
- *  @bug Ending the server using C-c signal does not close connections properly
+ *  @bug If server is closed using C-c and no client has connected to server yet
+ *  debug messages says that client socket was closed instead of welcome socket. But welcome socket was closed correctly.
  *
  */
 
@@ -25,13 +26,17 @@
 #include <unistd.h>
 #include "tcp.h"
 
+volatile int ctrl_c_received = false;
+int client_socket, server_socket;
+pid_t child_pid;
+
 Conn ParseArgs(int argc, char *const argv[])
 {
     int opt;
     Conn conn;
     conn.port = -1;
 
-    while ((opt = getopt(argc, argv, "h:p:m:")) != -1)
+    while ((opt = getopt(argc, argv, "p:f:")) != -1)
     {
         switch (opt)
         {
@@ -49,25 +54,24 @@ Conn ParseArgs(int argc, char *const argv[])
 
     if (conn.port == -1 || conn.file == NULL)
     {
-        fprintf(stderr, "Usage: %s  -p <port> -f <file>\n", argv[0]);
+        fprintf(stderr, "Usage: %s  -p <port> -f <file> port %d  file %s\n", argv[0], conn.port, conn.file);
+        exit(EXIT_FAILURE);
+    }
+
+    // TODO: test if this check works properly
+    if (conn.port < 0 || conn.port > 65536)
+    {
+        fprintf(stderr, "Port %d is out of range (0-65536)\n", conn.port);
         exit(EXIT_FAILURE);
     }
 
     // TODO:: check if file path exists and file is .csv
-    /* if (strcmp(conn.mode, "udp") != 0 && strcmp(conn.mode, "tcp") != 0)
-     {
-         fprintf(stderr, "Error: Invalid mode. Mode must be udp or tcp.\n");
-         exit(EXIT_FAILURE);
-     }
-     */
+
     return conn;
 }
 
-
-
 int CreateSocket()
 {
-    int server_socket;
     int type = SOCK_STREAM; // tcp
     int family = AF_INET6;  // ipv6
 
@@ -80,7 +84,7 @@ int CreateSocket()
     return server_socket;
 }
 
-void BindSocket(int server_socket, Conn conn)
+void BindSocket(Conn conn)
 {
     struct sockaddr_in6 server_addr;
 
@@ -98,7 +102,7 @@ void BindSocket(int server_socket, Conn conn)
     printf("Server is binded on port %d...\n", conn.port);
 }
 
-void Listen(int server_socket, Conn conn)
+void Listen(Conn conn)
 {
     // Listen for incoming connections
     if (listen(server_socket, MAX_USERS) == -1)
@@ -111,15 +115,45 @@ void Listen(int server_socket, Conn conn)
     printf("Server is listening on port %d...\n", conn.port);
 }
 
-void Accept(int server_socket)
+void handle_sigint(int signum)
 {
-    int client_socket;
+    printf("Received SIGINT. Closing all connections and exiting...\n");
+
+    // Set the ctrl_c_received flag to indicate that a Ctrl+C signal was received
+    ctrl_c_received = 1;
+
+    if (child_pid == 0)
+    {
+        printf("Client socket closing..\n");
+        if (close(client_socket) == 0)
+            printf("Client socket closed.\n");
+    }
+    else
+    {
+        printf("Welcome socket closing..\n");
+        if (close(server_socket) == 0)
+            printf("Welcome socket closed.\n");
+    }
+
+    exit(EXIT_SUCCESS);
+}
+
+void Accept()
+{
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
 
-//TODO: when C-c i received end all connections
+    // TODO: when C-c i received end all connections
     while (1)
     {
+        //? may not even be necessary
+        if (ctrl_c_received)
+        {
+            // The handle_sigint function will handle socket closure, child process termination,
+            // then it will exit.
+            break;
+        }
+
         client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_len);
         if (client_socket == -1)
         {
@@ -128,7 +162,7 @@ void Accept(int server_socket)
         }
 
         // Create a new process to handle the client
-        pid_t child_pid = fork();
+        child_pid = fork();
         if (child_pid == -1)
         {
             perror("Fork failed");
@@ -140,45 +174,35 @@ void Accept(int server_socket)
         {
             //* Child process
             close(server_socket); // Close the server socket in the child process
-            //TODO:: implement ldap logic here
-            
+            // TODO:: implement ldap logic here
+
             //?just to test connection remove later
             int bytestx;
-            char bufin[1024] = "BYE\n";
-            bytestx = send(client_socket, bufin, strlen(bufin), 0);
+            char bufin[1024] = "";
+            bzero(bufin, 1024);                            // refresh buffer
+            bytestx = recv(client_socket, bufin, 1024, 0); // recive response  to buffer
             if (bytestx < 0)
-                perror("ERROR in sendto");
-            
+                perror("ERROR in recvfrom");
 
             close(client_socket);
             exit(EXIT_SUCCESS);
         }
         else
         {
-            // Parent process
+            //* Parent process
             close(client_socket);
-
-           
         }
     }
 }
 
 int main(int argc, char *const argv[])
 {
-
-   
+    signal(SIGINT, handle_sigint);
     Conn conn = ParseArgs(argc, argv);
-    int server_socket = CreateSocket();
-    BindSocket(server_socket, conn);
-    Listen(server_socket, conn);
-    Accept(server_socket);
-    // TODO:DELETE this segment
-    //? NOTE: too keep server allive
-    char input[100];
-    printf("main code: ");
-    scanf("%s", input);
-    fgets(input, sizeof(input), stdin);
-
+    server_socket = CreateSocket();
+    BindSocket(conn);
+    Listen(conn);
+    Accept();
     close(server_socket);
     return 1;
 }
