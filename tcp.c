@@ -13,6 +13,8 @@
  *
  */
 
+// fdd3:ce44:9703:0::1/64
+
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -25,6 +27,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include "tcp.h"
+#include "ldap.h"
 
 volatile int ctrl_c_received = false;
 int client_socket, server_socket;
@@ -34,7 +37,8 @@ Conn ParseArgs(int argc, char *const argv[])
 {
     int opt;
     Conn conn;
-    conn.port = -1;
+    conn.port = DEFAULT_PORT;
+    conn.file = NULL;
 
     while ((opt = getopt(argc, argv, "p:f:")) != -1)
     {
@@ -174,15 +178,9 @@ void Accept()
         {
             //* Child process
             close(server_socket); // Close the server socket in the child process
-            // TODO:: implement ldap logic here
+                                  // TODO:: implement ldap logic here
 
-            //?just to test connection remove later
-            int bytestx;
-            char bufin[1024] = "";
-            bzero(bufin, 1024);                            // refresh buffer
-            bytestx = recv(client_socket, bufin, 1024, 0); // recive response  to buffer
-            if (bytestx < 0)
-                perror("ERROR in recvfrom");
+            ldap(client_socket);
 
             close(client_socket);
             exit(EXIT_SUCCESS);
