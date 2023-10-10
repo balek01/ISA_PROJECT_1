@@ -1,9 +1,23 @@
-CC=gcc
-CFLAGS=-Wall -g
-OUTPUT=isa-ldapserver
+# Compiler and flags
+CC = gcc
+CFLAGS = -Wall -g 
 
-build: tcp.c tcp.h
-	$(CC) $(CFLAGS) tcp.c -o $(OUTPUT)
+# List of source files
+SRC = ldap.c tcp.c
+# Generate a list of object files from source files
+OBJ = $(SRC:.c=.o)
+
+# Target executable
+TARGET = isa-ldapserver
+
+all: $(TARGET)
+
+$(TARGET): $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $^
+	rm -f *.o
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(OUTPUT)
+	rm -f $(OBJ) $(TARGET)
