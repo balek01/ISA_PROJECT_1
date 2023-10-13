@@ -27,10 +27,10 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include "tcp.h"
-#include "ldap.h"
+// #include "ldap.h"
 
 volatile int ctrl_c_received = false;
-int client_socket, server_socket;
+int clientSocket, serverSocket;
 pid_t child_pid;
 
 Conn ParseArgs(int argc, char *const argv[])
@@ -79,13 +79,15 @@ int CreateSocket()
     int type = SOCK_STREAM; // tcp
     int family = AF_INET6;  // ipv6
 
-    server_socket = socket(family, type, 0); // create ipv6 tcp socket
-    if (server_socket <= 0)
+    serverSocket = socket(family, type, 0); // create ipv6 tcp socket
+    if (serverSocket <= 0)
     {
         fprintf(stderr, "ERROR: could not create socket");
         exit(EXIT_FAILURE);
     }
-    return server_socket;
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0)
+        perror("setsockopt(SO_REUSEADDR) failed");
+    return serverSocket;
 }
 
 void BindSocket(Conn conn)
@@ -97,10 +99,10 @@ void BindSocket(Conn conn)
     server_addr.sin6_addr = in6addr_any;      // Listen on all available interfaces
     server_addr.sin6_port = htons(conn.port); // Port number
 
-    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
+    if (bind(serverSocket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
     {
         perror("Socket binding failed");
-        close(server_socket);
+        close(serverSocket);
         exit(EXIT_FAILURE);
     }
     printf("Server is binded on port %d...\n", conn.port);
@@ -109,10 +111,10 @@ void BindSocket(Conn conn)
 void Listen(Conn conn)
 {
     // Listen for incoming connections
-    if (listen(server_socket, MAX_USERS) == -1)
+    if (listen(serverSocket, MAX_USERS) == -1)
     {
         perror("Socket listening failed");
-        close(server_socket);
+        close(serverSocket);
         exit(EXIT_FAILURE);
     }
 
@@ -129,13 +131,13 @@ void handle_sigint(int signum)
     if (child_pid == 0)
     {
         printf("Client socket closing..\n");
-        if (close(client_socket) == 0)
+        if (close(clientSocket) == 0)
             printf("Client socket closed.\n");
     }
     else
     {
         printf("Welcome socket closing..\n");
-        if (close(server_socket) == 0)
+        if (close(serverSocket) == 0)
             printf("Welcome socket closed.\n");
     }
 
@@ -158,8 +160,8 @@ void Accept()
             break;
         }
 
-        client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_len);
-        if (client_socket == -1)
+        clientSocket = accept(serverSocket, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (clientSocket == -1)
         {
             perror("Accepting connection failed");
             continue;
@@ -170,25 +172,26 @@ void Accept()
         if (child_pid == -1)
         {
             perror("Fork failed");
-            close(client_socket);
+            close(clientSocket);
             continue;
         }
 
         if (child_pid == 0)
         {
             //* Child process
-            close(server_socket); // Close the server socket in the child process
-                                  // TODO:: implement ldap logic here
+            close(serverSocket); // Close the server socket in the child process
+                                 // TODO:: implement ldap logic here
+            printf("New client connection established: socket fd=%d\n", clientSocket);
 
-            ldap(client_socket);
-
-            close(client_socket);
+            ldap(clientSocket);
+            printf("Comunication done closing client socket fd=%d\n", clientSocket);
+            close(clientSocket);
             exit(EXIT_SUCCESS);
         }
         else
         {
             //* Parent process
-            close(client_socket);
+            close(clientSocket);
         }
     }
 }
@@ -197,10 +200,10 @@ int main(int argc, char *const argv[])
 {
     signal(SIGINT, handle_sigint);
     Conn conn = ParseArgs(argc, argv);
-    server_socket = CreateSocket();
+    serverSocket = CreateSocket();
     BindSocket(conn);
     Listen(conn);
     Accept();
-    close(server_socket);
+    close(serverSocket);
     return 1;
 }
