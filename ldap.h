@@ -7,7 +7,7 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 13, 2023
+ *  Last modified: Oct 15, 2023
  *
  *
  */
@@ -16,6 +16,7 @@
 #define LDAP_H
 
 int LDAP_MESSAGE_PREFIX = 0x30;
+int MAX_BUFFER_SIZE = 2048;
 
 enum LDAPPrtotocolOp
 {
@@ -44,19 +45,21 @@ enum LDAPPrtotocolOp
 
 enum TagType
 {
-    EOC = 0x00,
-    BOOLEAN = 0x01,
-    INTEGER = 0x02,
-    BIT_STRING = 0x03,
-    OCTET_STRING = 0x04,
+    EOC_TYPE = 0x00,
+    BOOLEAN_TYPE = 0x01,
+    INTEGER_TYPE = 0x02,
+    BIT_STRING_TYPE = 0x03,
+    OCTET_STRING_TYPE = 0x04,
     NULL_TYPE = 0x05,
-    MAX_BUFFER_SIZE = 2048
+    ENUMERATED_TYPE = 0x0A,
+
 };
 
 enum ResultCode
 {
     SUCCESS = 0,
     OPPERATION_ERROR = 1,
+    PROTOCOL_ERROR = 2,
     TIME_LIMIT_EXCEEDED = 3,
     SIZE_LIMIT_EXCEEDED = 4,
 };
@@ -128,8 +131,7 @@ void ldap(int client_socket);
  * @return A pointer to the received data (a dynamically allocated buffer).
  *         The caller is responsible for freeing this buffer.
  */
-unsigned char *ldap_receive(int client_socket, size_t *receivedBytes);
-
+unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes);
 /**
  * Parse an LDAP request to determine the LDAP operation.
  *
@@ -142,22 +144,9 @@ unsigned char *ldap_receive(int client_socket, size_t *receivedBytes);
  * @return 0 if the LDAP request is successfully parsed and represents a valid LDAP operation.
  *         A non-zero value is returned if an error occurs during parsing.
  */
-int ldap_parse_request(unsigned char *data, size_t length);
+int ldap_parse_request(unsigned char *data, size_t length, int client_socket);
 
-/**
- * Move to the next element in the LDAP data structure and update the global variable.
- *
- * This function is used to navigate through the elements in an LDAP data structure
- * in a sequential manner. It also updates the
- * global variable `currentTagPosition` based on the `LdapInfo.nextTagPosition` value.
- *
- * @param LdapInfo LdapElementInfo structure to get information about new tag position.
- */
-void ldap_next_element(LdapElementInfo LdapInfo);
-
-void ldap_search();
-void ldap_bind();
-void ldap_unbind();
+LdapBind ldap_bind(unsigned char *data, int message_id);
 
 /**
  * Print a hexadecimal representation of received data.
@@ -199,6 +188,16 @@ long long get_int_value(unsigned char *data);
  *
  * @param data A pointer to the data containing the string value.
  */
-void get_string_value(unsigned char *data);
+char *get_string_value(unsigned char *data);
+
+void ldap_bind_response(LdapBind bind, int client_socket);
+
+void add_ldap_byte(unsigned char *buff, int *offset, int value);
+
+void create_ldap_header(unsigned char *buff, int *offset, int messageId);
+
+void get_long_length_info(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue);
+LdapElementInfo get_ldap_element_info(unsigned char *data);
+void ldap_send(unsigned char *bufin, int client_socket, int offset);
 
 #endif

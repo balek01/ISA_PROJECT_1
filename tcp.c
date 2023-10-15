@@ -7,7 +7,7 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 3, 2023
+ *  Last modified: Oct 5, 2023
  *  @bug If server is closed using C-c and no client has connected to server yet
  *  debug messages says that client socket was closed instead of welcome socket. But welcome socket was closed correctly.
  *
@@ -149,7 +149,6 @@ void Accept()
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
 
-    // TODO: when C-c i received end all connections
     while (1)
     {
         //? may not even be necessary
@@ -180,11 +179,11 @@ void Accept()
         {
             //* Child process
             close(serverSocket); // Close the server socket in the child process
-                                 // TODO:: implement ldap logic here
-            printf("New client connection established: socket fd=%d\n", clientSocket);
 
+            printf("New client connection established: socket fd=%d\n", clientSocket);
             ldap(clientSocket);
             printf("Comunication done closing client socket fd=%d\n", clientSocket);
+
             close(clientSocket);
             exit(EXIT_SUCCESS);
         }

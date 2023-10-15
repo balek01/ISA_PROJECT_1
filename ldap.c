@@ -7,7 +7,7 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 13, 2023
+ *  Last modified: Oct 15, 2023
  *
  */
 #include <stdio.h>
@@ -23,13 +23,14 @@
 #include <unistd.h>
 #include "ldap.h"
 
-// represents offeset pointer to revecied data
+// represents offset pointer to revecied data
 int currentTagPosition;
 
-int ldap_parse_request(unsigned char *data, size_t length)
+int ldap_parse_request(unsigned char *data, size_t length, int client_socket)
 {
+    LdapElementInfo elementInfo = get_ldap_element_info(data);
 
-    if (data[0] != LDAP_MESSAGE_PREFIX)
+    if (elementInfo.tagValue != LDAP_MESSAGE_PREFIX)
     {
         printf("ERROR Received not an ldap message\n");
         return -1;
@@ -37,24 +38,19 @@ int ldap_parse_request(unsigned char *data, size_t length)
     if (length < 5)
         return -1;
 
-    unsigned char requestOperation = data[5];
+    int message_id = get_int_value(data);
+    elementInfo = get_ldap_element_info(data);
 
-    switch (requestOperation)
+    switch (elementInfo.tagValue)
     {
     case LDAP_BIND_REQUEST:
         printf("Received a Bind Request.\n");
-        ldap_bind(data);
+        LdapBind bind = ldap_bind(data, message_id);
+        ldap_bind_response(bind, client_socket);
         break;
     case LDAP_SEARCH_REQUEST:
         printf("Received a Search Request.\n");
         // ldap_search();
-        break;
-    case LDAP_MODIFY_REQUEST:
-        printf("Received a Modify Request.\n");
-        break;
-
-    case LDAP_UNBIND_REQUEST:
-        printf("Received a Unbind Request.\n");
         break;
 
         // TODO: Implement rest of operations
@@ -66,33 +62,165 @@ int ldap_parse_request(unsigned char *data, size_t length)
     return 0;
 }
 
-void ldap_bind(unsigned char *data)
+void ldap_send(unsigned char *bufin, int client_socket, int offset)
 {
-    LdapBind bind;
-    // TODO: define as constants
-    currentTagPosition = 7;
-    bind.version = get_int_value(data);
-    // TODO handle error response if version is different from 3
-
-    get_string_value(data);
-    printf("Version: %d\n", bind.version);
+    int bytestx;
+    // try to send buffer to connected host
+    printf("send data length: %d   %d\n", offset, bufin[0]);
+    bytestx = send(client_socket, bufin, offset, 0);
+    if (bytestx < 0)
+        perror("ERROR in sendto");
 }
 
-void ldap_response()
+LdapBind ldap_bind(unsigned char *data, int message_id)
 {
+    printf("\n****BIND REQUEST****\n");
+    LdapBind bind;
+    bind.message_id = message_id;
+    bind.version = get_int_value(data);
+
+    printf("Message id: %d\n", bind.message_id);
+    printf("Version: %d\n", bind.version);
+
+    return bind;
+}
+
+void create_ldap_header(unsigned char *buff, int *offset, int messageId)
+{
+    add_ldap_byte(buff, offset, LDAP_MESSAGE_PREFIX);
+    add_ldap_byte(buff, offset, 0x0C); // TODO:ACtualy compute this value
+
+    add_ldap_byte(buff, offset, INTEGER_TYPE);
+    add_ldap_byte(buff, offset, 1);
+    add_ldap_byte(buff, offset, messageId);
+}
+void add_integer(unsigned char *buff, int *offset, int value)
+{
+    int numBytes = 0;
+    int temp = value;
+
+    while (temp > 0)
+    {
+        temp >>= 8; // Shift 'temp' right by 8 bits (1 byte)
+        numBytes++;
+    }
+
+    add_ldap_byte(buff, offset, INTEGER_TYPE);
+    add_ldap_byte(buff, offset, numBytes);
+
+    // Add the integer data bytes (in big-endian byte order)
+    for (int i = numBytes; i > 0; i--)
+    {
+        add_ldap_byte(buff, offset, (value >> (i * 8)) & 0xFF); // 0xff mask to show only the lowest byte
+    }
+}
+
+void add_ldap_byte(unsigned char *buff, int *offset, int value)
+{
+    buff[*offset] = (unsigned char)value;
+    (*offset)++;
+}
+
+void ldap_bind_response(LdapBind bind, int client_socket)
+{
+    printf("\n****BIND RESPONSE****\n");
+    int offset = 0;
+    unsigned char buff[MAX_BUFFER_SIZE];
+    memset(buff, 0, MAX_BUFFER_SIZE); // clear the buffer
+
+    create_ldap_header(buff, &offset, bind.message_id);
+
+    add_ldap_byte(buff, &offset, LDAP_BIND_RESPONSE);
+    add_ldap_byte(buff, &offset, 0x07);
+
+    add_ldap_byte(buff, &offset, ENUMERATED_TYPE);
+    add_ldap_byte(buff, &offset, 0x01);
+
+    if (bind.version == 0x03)
+    {
+        add_ldap_byte(buff, &offset, SUCCESS);
+    }
+    else
+    {
+        add_ldap_byte(buff, &offset, PROTOCOL_ERROR);
+    }
+
+    add_ldap_byte(buff, &offset, OCTET_STRING_TYPE);
+    add_ldap_byte(buff, &offset, 0x00);
+
+    add_ldap_byte(buff, &offset, OCTET_STRING_TYPE);
+    add_ldap_byte(buff, &offset, 0x00);
+
+    ldap_send(buff, client_socket, offset);
+    print_hex_message(buff, offset);
+}
+void set_application_type(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue)
+{
+
+    printf("ITS APPLICATION type \n");
+
+    if (lengthValue >= 0x81 && lengthValue <= 0xFE)
+        elementInfo->lengthOfData = lengthValue - 0x80;
+
+    if (lengthValue <= 0x76)
+        elementInfo->lengthOfData = 0;
+
+    elementInfo->start = currentTagPosition + 1;
+    elementInfo->end = elementInfo->start;
+    elementInfo->nextTagPosition = currentTagPosition + elementInfo->lengthOfData + 2;
+}
+
+void set_universal_type(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue)
+{
+    printf("ITS UNIVERSAL type \n");
+    if (lengthValue <= 0x76) // maximum of length that can be encoded in one byte
+    {
+
+        elementInfo->lengthOfData = data[currentTagPosition + 1];
+        elementInfo->start = currentTagPosition + 2;
+        elementInfo->end = elementInfo->start + elementInfo->lengthOfData - 1;
+        elementInfo->nextTagPosition = currentTagPosition + elementInfo->lengthOfData + 2;
+    }
+    if (lengthValue >= 0x81 && lengthValue <= 0xFE)
+    {
+        get_long_length_info(data, elementInfo, lengthValue);
+        elementInfo->end = elementInfo->start + elementInfo->lengthOfData - 1;
+        elementInfo->nextTagPosition = currentTagPosition + elementInfo->lengthOfData + lengthValue - 0x80 + 2;
+    }
 }
 
 LdapElementInfo get_ldap_element_info(unsigned char *data)
 {
     LdapElementInfo elementInfo;
-    elementInfo.lengthOfData = data[currentTagPosition + 1];
-    elementInfo.start = currentTagPosition + 2;
-    elementInfo.end = elementInfo.start + elementInfo.lengthOfData - 1;
-    elementInfo.nextTagPosition = currentTagPosition + elementInfo.lengthOfData + 2;
     elementInfo.tagValue = data[currentTagPosition];
 
+    int lengthValue = data[currentTagPosition + 1];
+
+    if (elementInfo.tagValue <= 0x3F && elementInfo.tagValue != 0x30) // universal type
+    {
+        set_universal_type(data, &elementInfo, lengthValue);
+    }
+    else
+    {
+        set_application_type(data, &elementInfo, lengthValue);
+    }
+
     print_ldap_element_info(elementInfo);
+    currentTagPosition = elementInfo.nextTagPosition;
     return elementInfo;
+}
+
+void get_long_length_info(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue)
+{
+
+    int lengthOfLength = lengthValue - 0x80;
+    elementInfo->start = currentTagPosition + 1 + lengthOfLength;
+    elementInfo->lengthOfData = 0;
+    for (int i = currentTagPosition + 2; i <= elementInfo->start; i++)
+    {
+        printf("Data[i] %d\n", data[i]);
+        elementInfo->lengthOfData = elementInfo->lengthOfData * 256 + (int)data[i];
+    }
 }
 
 void print_ldap_element_info(LdapElementInfo elementInfo)
@@ -105,24 +233,30 @@ void print_ldap_element_info(LdapElementInfo elementInfo)
     printf("New Tag Position: %d\n\n", elementInfo.nextTagPosition);
 }
 
-void get_string_value(unsigned char *data)
+char *get_string_value(unsigned char *data)
 {
     LdapElementInfo LdapInfo = get_ldap_element_info(data);
 
-    if (LdapInfo.tagValue != OCTET_STRING) // TODO: end correctly
+    if (LdapInfo.tagValue != OCTET_STRING_TYPE) // TODO: end correctly
         printf("Unexpected element type");
 
-    for (int i = LdapInfo.start; i <= LdapInfo.end; i++)
+    char *extractedString = (char *)malloc(LdapInfo.lengthOfData + 1); // +1 for null terminator
+    if (extractedString)
     {
-        printf("%c", data[i]);
-    }
-    printf("\n");
-    ldap_next_element(LdapInfo);
-}
+        for (int i = LdapInfo.start, j = 0; i <= LdapInfo.end; i++, j++)
+        {
+            extractedString[j] = data[i];
+        }
+        extractedString[LdapInfo.lengthOfData] = '\0'; // Null-terminate the string
 
-void ldap_next_element(LdapElementInfo LdapInfo)
-{
-    currentTagPosition = LdapInfo.nextTagPosition;
+        return extractedString;
+    }
+    else
+    {
+
+        printf("Allocation failed.");
+        return NULL; // Return an error indicator or handle the error as needed
+    }
 }
 
 long long get_int_value(unsigned char *data)
@@ -130,7 +264,7 @@ long long get_int_value(unsigned char *data)
 
     LdapElementInfo LdapInfo = get_ldap_element_info(data);
 
-    if (LdapInfo.tagValue != INTEGER) // TODO: end correctly
+    if (LdapInfo.tagValue != INTEGER_TYPE) // TODO: end correctly
         printf("Unexpected element type");
     // Extract the integer value
     long long combinedDecimalNumber = 0;
@@ -146,7 +280,7 @@ long long get_int_value(unsigned char *data)
     {
         combinedDecimalNumber = data[LdapInfo.start];
     }
-    ldap_next_element(LdapInfo);
+
     return combinedDecimalNumber;
 }
 
@@ -197,7 +331,8 @@ void ldap(int clientSocket)
     unsigned char *receivedData = ldap_receive(clientSocket, &receivedBytes);
     print_hex_message(receivedData, receivedBytes);
 
-    if (ldap_parse_request(receivedData, receivedBytes) == -1)
+    currentTagPosition = 0;
+    if (ldap_parse_request(receivedData, receivedBytes, clientSocket) == -1)
     {
         printf("Error parsing \n");
         free(receivedData);
