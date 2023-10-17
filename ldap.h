@@ -51,8 +51,7 @@ enum TagType
     BIT_STRING_TYPE = 0x03,
     OCTET_STRING_TYPE = 0x04,
     NULL_TYPE = 0x05,
-    ENUMERATED_TYPE = 0x0A,
-
+    ENUMERATED_TYPE = 0x0A
 };
 
 enum ResultCode
@@ -61,7 +60,16 @@ enum ResultCode
     OPPERATION_ERROR = 1,
     PROTOCOL_ERROR = 2,
     TIME_LIMIT_EXCEEDED = 3,
-    SIZE_LIMIT_EXCEEDED = 4,
+    SIZE_LIMIT_EXCEEDED = 4
+};
+
+enum FilterType
+{
+    AND_FILTER = 0xA0,
+    OR_FILTER = 0xA1,
+    NOT_FILTER = 0xA2,
+    EQUALITY_MATCH_FILTER = 0xA3,
+    SUBSTRING_FILTER = 0xA4
 };
 
 /**
@@ -72,9 +80,40 @@ enum ResultCode
  */
 typedef struct
 {
-    int message_id; /**< The unique identifier for the LDAP Bind message. */
-    int version;    /**< The protocol version associated with the LDAP Bind message. */
+    int messageId; /**< The unique identifier for the LDAP Bind message. */
+    int version;   /**< The protocol version associated with the LDAP Bind message. */
 } LdapBind;
+
+/**
+ * Structure representing an LDAP Filter for search criteria.
+ *
+ * The LdapFilter structure is used to represent an LDAP Filter.
+ * It includes the attribute description, attribute value, and filter type.
+ */
+typedef struct
+{
+    char *attributeDescription; /**< The description of the attribute being filtered. */
+    char *attributeValue;       /**< The value used for the filter. */
+    enum FilterType filterType; /**< The type of filter (e.g., equality, presence, etc.). */
+} LdapFilter;
+
+/**
+ * Structure representing an LDAP Search request.
+ *
+ * The LdapSearch structure is used to represent an LDAP Search request, containing
+ * information about the search criteria, such as the base object, scope, and filter.
+ */
+typedef struct
+{
+    int messageId;     /**< The unique identifier for the LDAP  message. */
+    char *baseObject;  /**< The base object for the LDAP search. */
+    int scope;         /**< The search scope (base, one-level, or subtree). */
+    int derefAliases;  /**< How alias dereferencing should be handled. */
+    int sizeLimit;     /**< Maximum number of entries to return. */
+    int timeLimit;     /**< Maximum time allowed for the search. */
+    int typesOnly;     /**< Flag indicating whether to return attribute types only (0 for no, 1 for yes). */
+    LdapFilter filter; /**< The LDAP filter for the search. */
+} LdapSearch;
 
 /**
  * Structure representing the result of an LDAP operation.
@@ -184,20 +223,54 @@ long long get_int_value(unsigned char *data);
  * Extract a string value from received data at the element position indicated by 'currentTagPosition'.
  *
  * This function retrieves a string value from the received data at the element position specified
- * by the global variable 'currentTagPosition' and performs some action with the string data.
+ * by the global variable 'currentTagPosition' and increments the 'currentTagPosition'.
  *
  * @param data A pointer to the data containing the string value.
+ * @return The extracted string value or NULL if allocation failed.
  */
 char *get_string_value(unsigned char *data);
 
+/**
+ * Send an LDAP Bind response to the client.
+ *
+ * This function sends an LDAP Bind response to the client over the specified
+ * client socket. The response contains information about the Bind operation,
+ * including the message ID and result code.
+ *
+ * @param bind The LdapBind structure representing the Bind request.
+ * @param client_socket The socket for communication with the client.
+ */
 void ldap_bind_response(LdapBind bind, int client_socket);
 
+/**
+ * Add a byte to an LDAP message buffer and update the offset.
+ *
+ * This function adds a byte with the specified value to an LDAP message buffer,
+ * and it also updates the offset to the next position in the buffer.
+ *
+ * @param buff A pointer to the LDAP message buffer.
+ * @param offset A pointer to the offset indicating the current position in the buffer.
+ * @param value The byte value to be added to the buffer.
+ */
 void add_ldap_byte(unsigned char *buff, int *offset, int value);
 
+/**
+ * Create an LDAP message header and add it to a message buffer.
+ *
+ * This function creates an LDAP message header for a message with the specified
+ * message ID and adds it to the LDAP message buffer at the current offset.
+ *
+ * @param buff A pointer to the LDAP message buffer.
+ * @param offset A pointer to the offset indicating the current position in the buffer.
+ * @param messageId The unique identifier for the LDAP message.
+ */
 void create_ldap_header(unsigned char *buff, int *offset, int messageId);
 
 void get_long_length_info(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue);
 LdapElementInfo get_ldap_element_info(unsigned char *data);
 void ldap_send(unsigned char *bufin, int client_socket, int offset);
+LdapSearch ldap_search(unsigned char *data, int messageId);
+LdapFilter get_ldap_filter(unsigned char *data);
+void dispose_ldap_fiter(LdapFilter filter);
 
 #endif

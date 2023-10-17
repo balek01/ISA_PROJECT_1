@@ -38,19 +38,25 @@ int ldap_parse_request(unsigned char *data, size_t length, int client_socket)
     if (length < 5)
         return -1;
 
-    int message_id = get_int_value(data);
+    int messageId = get_int_value(data);
     elementInfo = get_ldap_element_info(data);
 
     switch (elementInfo.tagValue)
     {
     case LDAP_BIND_REQUEST:
         printf("Received a Bind Request.\n");
-        LdapBind bind = ldap_bind(data, message_id);
+        LdapBind bind = ldap_bind(data, messageId);
         ldap_bind_response(bind, client_socket);
         break;
     case LDAP_SEARCH_REQUEST:
         printf("Received a Search Request.\n");
-        // ldap_search();
+        LdapSearch search = ldap_search(data, messageId);
+        dispose_ldap_fiter(search.filter);
+        free(search.baseObject);
+        break;
+    case LDAP_UNBIND_REQUEST:
+        printf("Received a Unbind Request.\n");
+        return 1;
         break;
 
         // TODO: Implement rest of operations
@@ -65,21 +71,56 @@ int ldap_parse_request(unsigned char *data, size_t length, int client_socket)
 void ldap_send(unsigned char *bufin, int client_socket, int offset)
 {
     int bytestx;
-    // try to send buffer to connected host
-    printf("send data length: %d   %d\n", offset, bufin[0]);
+    // try to send buffer to connected client
     bytestx = send(client_socket, bufin, offset, 0);
     if (bytestx < 0)
         perror("ERROR in sendto");
+    printf("Data has been sent to connected client.\n");
 }
 
-LdapBind ldap_bind(unsigned char *data, int message_id)
+LdapSearch ldap_search(unsigned char *data, int messageId)
+{
+    printf("\n****SEARCH REQUEST****\n");
+    LdapSearch search;
+
+    search.messageId = messageId;
+    search.baseObject = get_string_value(data);
+    printf("Base object Class: %s\n", search.baseObject);
+
+    search.scope = get_int_value(data);
+    printf("Scope: %d\n", search.scope);
+    search.derefAliases = get_int_value(data);
+    search.sizeLimit = get_int_value(data);
+    search.timeLimit = get_int_value(data);
+    search.typesOnly = get_int_value(data);
+    search.filter = get_ldap_filter(data);
+    return search;
+}
+
+LdapFilter get_ldap_filter(unsigned char *data)
+{
+    LdapFilter filter;
+    filter.filterType = get_ldap_element_info(data).tagValue;
+    filter.attributeDescription = get_string_value(data);
+    printf("Attribute description %s\n", filter.attributeDescription);
+    filter.attributeValue = get_string_value(data);
+    printf("Attribute value %s\n", filter.attributeValue);
+    return filter;
+}
+void dispose_ldap_fiter(LdapFilter filter)
+{
+    free(filter.attributeDescription);
+    free(filter.attributeValue);
+}
+
+LdapBind ldap_bind(unsigned char *data, int messageId)
 {
     printf("\n****BIND REQUEST****\n");
     LdapBind bind;
-    bind.message_id = message_id;
+    bind.messageId = messageId;
     bind.version = get_int_value(data);
 
-    printf("Message id: %d\n", bind.message_id);
+    printf("Message id: %d\n", bind.messageId);
     printf("Version: %d\n", bind.version);
 
     return bind;
@@ -128,7 +169,7 @@ void ldap_bind_response(LdapBind bind, int client_socket)
     unsigned char buff[MAX_BUFFER_SIZE];
     memset(buff, 0, MAX_BUFFER_SIZE); // clear the buffer
 
-    create_ldap_header(buff, &offset, bind.message_id);
+    create_ldap_header(buff, &offset, bind.messageId);
 
     add_ldap_byte(buff, &offset, LDAP_BIND_RESPONSE);
     add_ldap_byte(buff, &offset, 0x07);
@@ -238,7 +279,7 @@ char *get_string_value(unsigned char *data)
     LdapElementInfo LdapInfo = get_ldap_element_info(data);
 
     if (LdapInfo.tagValue != OCTET_STRING_TYPE) // TODO: end correctly
-        printf("Unexpected element type");
+        printf("Unexpected element type\n");
 
     char *extractedString = (char *)malloc(LdapInfo.lengthOfData + 1); // +1 for null terminator
     if (extractedString)
@@ -253,7 +294,6 @@ char *get_string_value(unsigned char *data)
     }
     else
     {
-
         printf("Allocation failed.");
         return NULL; // Return an error indicator or handle the error as needed
     }
@@ -264,8 +304,6 @@ long long get_int_value(unsigned char *data)
 
     LdapElementInfo LdapInfo = get_ldap_element_info(data);
 
-    if (LdapInfo.tagValue != INTEGER_TYPE) // TODO: end correctly
-        printf("Unexpected element type");
     // Extract the integer value
     long long combinedDecimalNumber = 0;
 
@@ -304,7 +342,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
     if (bytesReceived < 0)
     {
         perror("recv");
-        exit(1);
+        exit(1); // TODO
     }
 
     // Allocate memory for the received data
@@ -312,7 +350,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
     if (receivedData == NULL)
     {
         perror("malloc");
-        exit(1);
+        exit(1); // TODO
     }
 
     // Copy the received data to the allocated array
@@ -327,17 +365,22 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
 void ldap(int clientSocket)
 {
     size_t receivedBytes;
-
-    unsigned char *receivedData = ldap_receive(clientSocket, &receivedBytes);
-    print_hex_message(receivedData, receivedBytes);
-
-    currentTagPosition = 0;
-    if (ldap_parse_request(receivedData, receivedBytes, clientSocket) == -1)
+    int recivedDataCode;
+    while (recivedDataCode != 1)
     {
-        printf("Error parsing \n");
+        unsigned char *receivedData = ldap_receive(clientSocket, &receivedBytes);
+        printf("Received data from client.\n");
+        print_hex_message(receivedData, receivedBytes);
+
+        currentTagPosition = 0;
+        recivedDataCode = ldap_parse_request(receivedData, receivedBytes, clientSocket);
+        if (recivedDataCode == -1)
+        {
+            printf("Error parsing \n");
+            free(receivedData);
+            return;
+        }
+        // Free the allocated memory for receivedData
         free(receivedData);
-        return;
     }
-    // Free the allocated memory for receivedData
-    free(receivedData);
 }
