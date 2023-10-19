@@ -17,6 +17,7 @@
 
 int LDAP_MESSAGE_PREFIX = 0x30;
 int MAX_BUFFER_SIZE = 2048;
+int LDAP_MSG_LENGTH_OFFSET = 1;
 
 enum LDAPPrtotocolOp
 {
@@ -60,7 +61,9 @@ enum ResultCode
     OPPERATION_ERROR = 1,
     PROTOCOL_ERROR = 2,
     TIME_LIMIT_EXCEEDED = 3,
-    SIZE_LIMIT_EXCEEDED = 4
+    SIZE_LIMIT_EXCEEDED = 4,
+    UNSUPORTED_FILTER = 5,
+    UNWILLING_TO_PERFORM = 53
 };
 
 enum FilterType
@@ -105,14 +108,15 @@ typedef struct
  */
 typedef struct
 {
-    int messageId;     /**< The unique identifier for the LDAP  message. */
-    char *baseObject;  /**< The base object for the LDAP search. */
-    int scope;         /**< The search scope (base, one-level, or subtree). */
-    int derefAliases;  /**< How alias dereferencing should be handled. */
-    int sizeLimit;     /**< Maximum number of entries to return. */
-    int timeLimit;     /**< Maximum time allowed for the search. */
-    int typesOnly;     /**< Flag indicating whether to return attribute types only (0 for no, 1 for yes). */
-    LdapFilter filter; /**< The LDAP filter for the search. */
+    int messageId;              /**< The unique identifier for the LDAP  message. */
+    char *baseObject;           /**< The base object for the LDAP search. */
+    int scope;                  /**< The search scope (base, one-level, or subtree). */
+    int derefAliases;           /**< How alias dereferencing should be handled. */
+    int sizeLimit;              /**< Maximum number of entries to return. */
+    int timeLimit;              /**< Maximum time allowed for the search. */
+    int typesOnly;              /**< Flag indicating whether to return attribute types only (0 for no, 1 for yes). */
+    LdapFilter filter;          /**< The LDAP filter for the search. */
+    enum ResultCode returnCode; /**< Return code indicating whether the search was successful. */
 } LdapSearch;
 
 /**
@@ -155,7 +159,7 @@ typedef struct
     unsigned char tagValue; /**< The tag value associated with the LDAP element. */
 } LdapElementInfo;
 
-void ldap(int client_socket);
+void ldap(int clientSocket);
 
 /**
  * Receive LDAP data from a client socket.
@@ -164,7 +168,7 @@ void ldap(int client_socket);
  * and stores it in a buffer. It also updates the receivedBytes variable
  * with the number of bytes received.
  *
- * @param client_socket The socket to receive data from.
+ * @param clientSocket The socket to receive data from.
  * @param receivedBytes A pointer to a size_t variable to store the number of received bytes.
  *
  * @return A pointer to the received data (a dynamically allocated buffer).
@@ -183,7 +187,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes);
  * @return 0 if the LDAP request is successfully parsed and represents a valid LDAP operation.
  *         A non-zero value is returned if an error occurs during parsing.
  */
-int ldap_parse_request(unsigned char *data, size_t length, int client_socket);
+int ldap_parse_request(unsigned char *data, size_t length, int clientSocket);
 
 LdapBind ldap_bind(unsigned char *data, int message_id);
 
@@ -238,9 +242,9 @@ char *get_string_value(unsigned char *data);
  * including the message ID and result code.
  *
  * @param bind The LdapBind structure representing the Bind request.
- * @param client_socket The socket for communication with the client.
+ * @param clientSocket The socket for communication with the client.
  */
-void ldap_bind_response(LdapBind bind, int client_socket);
+void ldap_bind_response(LdapBind bind, int clientSocket);
 
 /**
  * Add a byte to an LDAP message buffer and update the offset.
@@ -268,9 +272,13 @@ void create_ldap_header(unsigned char *buff, int *offset, int messageId);
 
 void get_long_length_info(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue);
 LdapElementInfo get_ldap_element_info(unsigned char *data);
-void ldap_send(unsigned char *bufin, int client_socket, int offset);
+void ldap_send(unsigned char *bufin, int clientSocket, int offset);
 LdapSearch ldap_search(unsigned char *data, int messageId);
-LdapFilter get_ldap_filter(unsigned char *data);
-void dispose_ldap_fiter(LdapFilter filter);
+LdapFilter get_ldap_filter(unsigned char *data, LdapSearch *search);
+void dispose_ldap_search(LdapSearch search);
+void ldap_search_response(LdapSearch search, int clientSocket);
+void print_ldap_search(LdapSearch search);
+void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int clientSocket);
+void add_ldap_string(unsigned char *buff, int *offset, char *string);
 
 #endif

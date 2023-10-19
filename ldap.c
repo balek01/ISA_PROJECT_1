@@ -26,7 +26,7 @@
 // represents offset pointer to revecied data
 int currentTagPosition;
 
-int ldap_parse_request(unsigned char *data, size_t length, int client_socket)
+int ldap_parse_request(unsigned char *data, size_t length, int clientSocket)
 {
     LdapElementInfo elementInfo = get_ldap_element_info(data);
 
@@ -46,13 +46,14 @@ int ldap_parse_request(unsigned char *data, size_t length, int client_socket)
     case LDAP_BIND_REQUEST:
         printf("Received a Bind Request.\n");
         LdapBind bind = ldap_bind(data, messageId);
-        ldap_bind_response(bind, client_socket);
+        ldap_bind_response(bind, clientSocket);
         break;
     case LDAP_SEARCH_REQUEST:
         printf("Received a Search Request.\n");
         LdapSearch search = ldap_search(data, messageId);
-        dispose_ldap_fiter(search.filter);
-        free(search.baseObject);
+        print_ldap_search(search);
+        ldap_search_response(search, clientSocket);
+        dispose_ldap_search(search);
         break;
     case LDAP_UNBIND_REQUEST:
         printf("Received a Unbind Request.\n");
@@ -82,35 +83,89 @@ LdapSearch ldap_search(unsigned char *data, int messageId)
 {
     printf("\n****SEARCH REQUEST****\n");
     LdapSearch search;
-
+    search.returnCode = SUCCESS;
     search.messageId = messageId;
     search.baseObject = get_string_value(data);
-    printf("Base object Class: %s\n", search.baseObject);
-
     search.scope = get_int_value(data);
-    printf("Scope: %d\n", search.scope);
     search.derefAliases = get_int_value(data);
     search.sizeLimit = get_int_value(data);
     search.timeLimit = get_int_value(data);
     search.typesOnly = get_int_value(data);
-    search.filter = get_ldap_filter(data);
+    search.filter = get_ldap_filter(data, &search);
     return search;
 }
 
-LdapFilter get_ldap_filter(unsigned char *data)
+void ldap_search_response(LdapSearch search, int clientSocket)
+{
+    printf("\n****SEARCH RESPONSE****\n");
+    int offset = 0;
+    unsigned char buff[MAX_BUFFER_SIZE];
+    memset(buff, 0, MAX_BUFFER_SIZE); // clear the buffer
+
+    create_ldap_header(buff, &offset, search.messageId);
+    if (search.returnCode != SUCCESS)
+    {
+        ldap_search_res_done(buff, &offset, search.returnCode, clientSocket);
+        return;
+    }
+    else
+    {
+        // TODO:
+    }
+}
+void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int clientSocket)
+{
+    add_ldap_byte(buff, offset, LDAP_SEARCH_RESULT_DONE);
+    int resultLengthOffset = (*offset);
+    add_ldap_byte(buff, offset, 0x00); // placeholder
+    add_ldap_byte(buff, offset, ENUMERATED_TYPE);
+    add_ldap_byte(buff, offset, 0x01);
+    if (returnCode == SUCCESS)
+    {
+        add_ldap_byte(buff, offset, SUCCESS);
+
+        add_ldap_string(buff, offset, "");
+
+        add_ldap_string(buff, offset, "");
+    }
+
+    if (returnCode == UNSUPORTED_FILTER)
+    {
+        add_ldap_byte(buff, offset, UNWILLING_TO_PERFORM);
+
+        add_ldap_string(buff, offset, "");
+
+        add_ldap_string(buff, offset, "Usage of unsuported filter.");
+    }
+    buff[resultLengthOffset] = (*offset) - 1 - resultLengthOffset;
+    buff[1] = (*offset) - 2;
+    ldap_send(buff, clientSocket, *offset);
+    print_hex_message(buff, *offset);
+}
+
+LdapFilter get_ldap_filter(unsigned char *data, LdapSearch *search)
 {
     LdapFilter filter;
     filter.filterType = get_ldap_element_info(data).tagValue;
+
+    if (filter.filterType != EQUALITY_MATCH_FILTER && filter.filterType != SUBSTRING_FILTER)
+    { // suported filters
+        printf("ERROR unsupported filter %02X \n", filter.filterType);
+        search->returnCode = UNSUPORTED_FILTER;
+        filter.attributeDescription = NULL;
+        filter.attributeValue = NULL;
+        return filter;
+    }
+
     filter.attributeDescription = get_string_value(data);
-    printf("Attribute description %s\n", filter.attributeDescription);
     filter.attributeValue = get_string_value(data);
-    printf("Attribute value %s\n", filter.attributeValue);
     return filter;
 }
-void dispose_ldap_fiter(LdapFilter filter)
+void dispose_ldap_search(LdapSearch search)
 {
-    free(filter.attributeDescription);
-    free(filter.attributeValue);
+    free(search.filter.attributeDescription);
+    free(search.filter.attributeValue);
+    free(search.baseObject);
 }
 
 LdapBind ldap_bind(unsigned char *data, int messageId)
@@ -129,7 +184,7 @@ LdapBind ldap_bind(unsigned char *data, int messageId)
 void create_ldap_header(unsigned char *buff, int *offset, int messageId)
 {
     add_ldap_byte(buff, offset, LDAP_MESSAGE_PREFIX);
-    add_ldap_byte(buff, offset, 0x0C); // TODO:ACtualy compute this value
+    add_ldap_byte(buff, offset, 0x00); // placeholder value
 
     add_ldap_byte(buff, offset, INTEGER_TYPE);
     add_ldap_byte(buff, offset, 1);
@@ -162,6 +217,17 @@ void add_ldap_byte(unsigned char *buff, int *offset, int value)
     (*offset)++;
 }
 
+void add_ldap_string(unsigned char *buff, int *offset, char *string)
+{
+    int lenght = strlen(string);
+    add_ldap_byte(buff, offset, OCTET_STRING_TYPE);
+    add_ldap_byte(buff, offset, lenght);
+    for (size_t i = 0; i < lenght; i++)
+    {
+        add_ldap_byte(buff, offset, string[i]);
+    }
+}
+
 void ldap_bind_response(LdapBind bind, int client_socket)
 {
     printf("\n****BIND RESPONSE****\n");
@@ -186,19 +252,18 @@ void ldap_bind_response(LdapBind bind, int client_socket)
         add_ldap_byte(buff, &offset, PROTOCOL_ERROR);
     }
 
-    add_ldap_byte(buff, &offset, OCTET_STRING_TYPE);
-    add_ldap_byte(buff, &offset, 0x00);
+    add_ldap_string(buff, &offset, "");
 
-    add_ldap_byte(buff, &offset, OCTET_STRING_TYPE);
-    add_ldap_byte(buff, &offset, 0x00);
+    add_ldap_string(buff, &offset, "");
 
+    buff[LDAP_MSG_LENGTH_OFFSET] = offset - 2; // ldap msg tag, and length
     ldap_send(buff, client_socket, offset);
+
     print_hex_message(buff, offset);
 }
+
 void set_application_type(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue)
 {
-
-    printf("ITS APPLICATION type \n");
 
     if (lengthValue >= 0x81 && lengthValue <= 0xFE)
         elementInfo->lengthOfData = lengthValue - 0x80;
@@ -213,7 +278,7 @@ void set_application_type(unsigned char *data, LdapElementInfo *elementInfo, int
 
 void set_universal_type(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue)
 {
-    printf("ITS UNIVERSAL type \n");
+
     if (lengthValue <= 0x76) // maximum of length that can be encoded in one byte
     {
 
@@ -246,7 +311,7 @@ LdapElementInfo get_ldap_element_info(unsigned char *data)
         set_application_type(data, &elementInfo, lengthValue);
     }
 
-    print_ldap_element_info(elementInfo);
+    //     print_ldap_element_info(elementInfo);
     currentTagPosition = elementInfo.nextTagPosition;
     return elementInfo;
 }
@@ -259,7 +324,7 @@ void get_long_length_info(unsigned char *data, LdapElementInfo *elementInfo, int
     elementInfo->lengthOfData = 0;
     for (int i = currentTagPosition + 2; i <= elementInfo->start; i++)
     {
-        printf("Data[i] %d\n", data[i]);
+
         elementInfo->lengthOfData = elementInfo->lengthOfData * 256 + (int)data[i];
     }
 }
@@ -329,6 +394,21 @@ void print_hex_message(const unsigned char *data, size_t length)
         printf("%02X ", data[i]); // Print each byte in hexadecimal format
     }
     printf("\n");
+}
+void print_ldap_search(LdapSearch search)
+{
+    printf("LDAP search print:\n");
+    printf("Return code: %d\n", search.returnCode);
+    printf("MessageId: %d\n", search.messageId);
+    printf("BaseObject: %s\n", search.baseObject);
+    printf("Scope: %d\n", search.scope);
+    printf("DerefAliases: %d\n", search.derefAliases);
+    printf("Size limit: %d\n", search.sizeLimit);
+    printf("Time limit: %d\n", search.timeLimit);
+    printf("TypesOnly: %d\n", search.typesOnly);
+    printf("Filter type: %02X\n", search.filter.filterType);
+    printf("Filter attribute description: %s\n", search.filter.attributeDescription);
+    printf("Filter attribute value: %s\n", search.filter.attributeValue);
 }
 
 unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
