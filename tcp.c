@@ -31,7 +31,7 @@
 
 volatile int ctrl_c_received = false;
 int clientSocket, serverSocket;
-pid_t child_pid;
+pid_t pid;
 
 Conn ParseArgs(int argc, char *const argv[])
 {
@@ -128,7 +128,7 @@ void handle_sigint(int signum)
     // Set the ctrl_c_received flag to indicate that a Ctrl+C signal was received
     ctrl_c_received = 1;
 
-    if (child_pid == 0)
+    if (pid == 0)
     {
         printf("Client socket closing..\n");
         if (close(clientSocket) == 0)
@@ -167,15 +167,20 @@ void Accept()
         }
 
         // Create a new process to handle the client
-        child_pid = fork();
-        if (child_pid == -1)
+        pid = fork();
+        if (pid == -1)
         {
             perror("Fork failed");
             close(clientSocket);
             continue;
         }
 
-        if (child_pid == 0)
+        if (pid > 0)
+        {
+            //* Parent process
+            close(clientSocket);
+        }
+        if (pid == 0)
         {
             //* Child process
             close(serverSocket); // Close the server socket in the child process
@@ -186,11 +191,6 @@ void Accept()
 
             close(clientSocket);
             exit(EXIT_SUCCESS);
-        }
-        else
-        {
-            //* Parent process
-            close(clientSocket);
         }
     }
 }
