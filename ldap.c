@@ -7,7 +7,7 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 15, 2023
+ *  Last modified: Oct 21, 2023
  *
  */
 #include <stdio.h>
@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <ctype.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -26,7 +27,7 @@
 // represents offset pointer to revecied data
 int currentTagPosition;
 
-int ldap_parse_request(unsigned char *data, size_t length, int clientSocket)
+int ldap_parse_request(unsigned char *data, size_t length, int clientSocket, FILE *file)
 {
     LdapElementInfo elementInfo = get_ldap_element_info(data);
 
@@ -52,7 +53,7 @@ int ldap_parse_request(unsigned char *data, size_t length, int clientSocket)
         printf("Received a Search Request.\n");
         LdapSearch search = ldap_search(data, messageId);
         print_ldap_search(search);
-        ldap_search_response(search, clientSocket);
+        ldap_search_response(search, clientSocket, file);
         dispose_ldap_search(search);
         break;
     case LDAP_UNBIND_REQUEST:
@@ -95,7 +96,7 @@ LdapSearch ldap_search(unsigned char *data, int messageId)
     return search;
 }
 
-void ldap_search_response(LdapSearch search, int clientSocket)
+void ldap_search_response(LdapSearch search, int clientSocket, FILE *file)
 {
     printf("\n****SEARCH RESPONSE****\n");
     int offset = 0;
@@ -106,13 +107,90 @@ void ldap_search_response(LdapSearch search, int clientSocket)
     if (search.returnCode != SUCCESS)
     {
         ldap_search_res_done(buff, &offset, search.returnCode, clientSocket);
-        return;
     }
     else
     {
-        // TODO:
+
+        ldap_add_search_matches(buff, &offset, search.filter, file);
     }
 }
+void to_lowercase(char *string)
+{
+    for (int i = 0; string[i] != '\0'; i++)
+    {
+        string[i] = tolower(string[i]);
+    }
+}
+int get_targeted_column(LdapFilter filter)
+{
+    to_lowercase(filter.attributeDescription);
+    if (strcmp(filter.attributeDescription, "cn") == 0 || strcmp(filter.attributeDescription, "commonname") == 0)
+        return COMMON_NAME;
+
+    if (strcmp(filter.attributeDescription, "uid") == 0 || strcmp(filter.attributeDescription, "userid") == 0)
+        return UID;
+
+    if (strcmp(filter.attributeDescription, "mail") == 0)
+        return MAIL;
+
+    printf("Unknown attribute");
+    return -1;
+}
+void ldap_add_search_matches(unsigned char *buff, int *offset, LdapFilter filter, FILE *file)
+{
+    char line[1024];
+    char idk[1024];
+    int targetColumn = get_targeted_column(filter);
+    rewind(file);
+
+    while (fgets(line, sizeof(line), file))
+    {
+        strcpy(idk, line);
+        char *token = strtok(line, ",");
+        int column = 0;
+
+        while (token != NULL)
+        {
+            if (column == targetColumn)
+            {
+                int match = 0;
+
+                if (filter.filterType == EQUALITY_MATCH_FILTER && strcmp(filter.attributeValue, token) == 0)
+                { // Full match
+                    match = 1;
+                }
+                else if (filter.substringType == PREFIX && strncmp(filter.attributeValue, token, strlen(filter.attributeValue)) == 0)
+                { // Prefix
+                    match = 1;
+                }
+                else if (filter.substringType == INFIX && strstr(token, filter.attributeValue) != NULL)
+                { // Infix
+                    match = 1;
+                }
+                else if (filter.substringType == POSTFIX)
+                { // Postfix
+                    int token_len = strlen(token);
+                    int value_len = strlen(filter.attributeValue);
+
+                    if (token_len >= value_len && strcmp(filter.attributeValue, token + (token_len - value_len)) == 0)
+                    {
+                        match = 1;
+                    }
+                }
+
+                if (match)
+                {
+                    printf("%s", idk);
+                }
+                break;
+            }
+
+            token = strtok(NULL, ",");
+            column++;
+        }
+    }
+}
+
 void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int clientSocket)
 {
     add_ldap_byte(buff, offset, LDAP_SEARCH_RESULT_DONE);
@@ -135,7 +213,7 @@ void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int 
 
         add_ldap_string(buff, offset, "");
 
-        add_ldap_string(buff, offset, "Usage of unsuported filter.");
+        add_ldap_string(buff, offset, "Usage of unsupported filter.");
     }
     buff[resultLengthOffset] = (*offset) - 1 - resultLengthOffset;
     buff[1] = (*offset) - 2;
@@ -158,7 +236,18 @@ LdapFilter get_ldap_filter(unsigned char *data, LdapSearch *search)
     }
 
     filter.attributeDescription = get_string_value(data);
-    filter.attributeValue = get_string_value(data);
+
+    if (filter.filterType == EQUALITY_MATCH_FILTER)
+    {
+        filter.attributeValue = get_string_value(data);
+    }
+    else
+    {
+        get_ldap_element_info(data);
+        filter.substringType = data[currentTagPosition];
+        filter.attributeValue = get_string_value(data);
+    }
+
     return filter;
 }
 void dispose_ldap_search(LdapSearch search)
@@ -186,9 +275,7 @@ void create_ldap_header(unsigned char *buff, int *offset, int messageId)
     add_ldap_byte(buff, offset, LDAP_MESSAGE_PREFIX);
     add_ldap_byte(buff, offset, 0x00); // placeholder value
 
-    add_ldap_byte(buff, offset, INTEGER_TYPE);
-    add_ldap_byte(buff, offset, 1);
-    add_ldap_byte(buff, offset, messageId);
+    add_integer(buff, offset, messageId);
 }
 void add_integer(unsigned char *buff, int *offset, int value)
 {
@@ -197,7 +284,7 @@ void add_integer(unsigned char *buff, int *offset, int value)
 
     while (temp > 0)
     {
-        temp >>= 8; // Shift 'temp' right by 8 bits (1 byte)
+        temp >>= 8; // Shift 'temp' right by 8 bits
         numBytes++;
     }
 
@@ -207,7 +294,7 @@ void add_integer(unsigned char *buff, int *offset, int value)
     // Add the integer data bytes (in big-endian byte order)
     for (int i = numBytes; i > 0; i--)
     {
-        add_ldap_byte(buff, offset, (value >> (i * 8)) & 0xFF); // 0xff mask to show only the lowest byte
+        add_ldap_byte(buff, offset, (value >> ((i - 1) * 8)) & 0xFF); // 0xff mask to show only the lowest byte
     }
 }
 
@@ -301,16 +388,18 @@ LdapElementInfo get_ldap_element_info(unsigned char *data)
     elementInfo.tagValue = data[currentTagPosition];
 
     int lengthValue = data[currentTagPosition + 1];
-
-    if (elementInfo.tagValue <= 0x3F && elementInfo.tagValue != 0x30) // universal type
+    if (elementInfo.tagValue <= POSTFIX && elementInfo.tagValue >= PREFIX)
     {
         set_universal_type(data, &elementInfo, lengthValue);
     }
-    else
+    else if (elementInfo.tagValue > 0x3F || elementInfo.tagValue == LDAP_MESSAGE_PREFIX) // universal type
     {
         set_application_type(data, &elementInfo, lengthValue);
     }
-
+    else
+    {
+        set_universal_type(data, &elementInfo, lengthValue);
+    }
     //     print_ldap_element_info(elementInfo);
     currentTagPosition = elementInfo.nextTagPosition;
     return elementInfo;
@@ -342,9 +431,6 @@ void print_ldap_element_info(LdapElementInfo elementInfo)
 char *get_string_value(unsigned char *data)
 {
     LdapElementInfo LdapInfo = get_ldap_element_info(data);
-
-    if (LdapInfo.tagValue != OCTET_STRING_TYPE) // TODO: end correctly
-        printf("Unexpected element type\n");
 
     char *extractedString = (char *)malloc(LdapInfo.lengthOfData + 1); // +1 for null terminator
     if (extractedString)
@@ -442,7 +528,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
     return receivedData;
 }
 
-void ldap(int clientSocket)
+void ldap(int clientSocket, FILE *file)
 {
     size_t receivedBytes;
     int recivedDataCode;
@@ -453,7 +539,7 @@ void ldap(int clientSocket)
         print_hex_message(receivedData, receivedBytes);
 
         currentTagPosition = 0;
-        recivedDataCode = ldap_parse_request(receivedData, receivedBytes, clientSocket);
+        recivedDataCode = ldap_parse_request(receivedData, receivedBytes, clientSocket, file);
         if (recivedDataCode == -1)
         {
             printf("Error parsing \n");
