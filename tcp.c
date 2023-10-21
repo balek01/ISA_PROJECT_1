@@ -7,7 +7,7 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 5, 2023
+ *  Last modified: Oct 21, 2023
  *  @bug If server is closed using C-c and no client has connected to server yet
  *  debug messages says that client socket was closed instead of welcome socket. But welcome socket was closed correctly.
  *
@@ -27,10 +27,10 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include "tcp.h"
-// #include "ldap.h"
 
 volatile int ctrl_c_received = false;
 int clientSocket, serverSocket;
+FILE *filePtr;
 pid_t pid;
 
 Conn ParseArgs(int argc, char *const argv[])
@@ -38,7 +38,7 @@ Conn ParseArgs(int argc, char *const argv[])
     int opt;
     Conn conn;
     conn.port = DEFAULT_PORT;
-    conn.file = NULL;
+    conn.filePath = NULL;
 
     while ((opt = getopt(argc, argv, "p:f:")) != -1)
     {
@@ -48,7 +48,7 @@ Conn ParseArgs(int argc, char *const argv[])
             conn.port = atoi(optarg);
             break;
         case 'f':
-            conn.file = optarg;
+            conn.filePath = optarg;
             break;
         default:
             fprintf(stderr, "Usage: %s -p <port> -f <file>\n", argv[0]);
@@ -56,9 +56,9 @@ Conn ParseArgs(int argc, char *const argv[])
         }
     }
 
-    if (conn.port == -1 || conn.file == NULL)
+    if (conn.port == -1 || conn.filePath == NULL)
     {
-        fprintf(stderr, "Usage: %s  -p <port> -f <file> port %d  file %s\n", argv[0], conn.port, conn.file);
+        fprintf(stderr, "Usage: %s  -p <port> -f <file> port %d  filePath %s\n", argv[0], conn.port, conn.filePath);
         exit(EXIT_FAILURE);
     }
 
@@ -70,6 +70,13 @@ Conn ParseArgs(int argc, char *const argv[])
     }
 
     // TODO:: check if file path exists and file is .csv
+    conn.filePtr = fopen(conn.filePath, "r");
+    filePtr = conn.filePtr;
+    if (conn.filePtr == NULL)
+    {
+        fprintf(stderr, "Failed to open file %s\n", conn.filePath);
+        exit(EXIT_FAILURE);
+    }
 
     return conn;
 }
@@ -140,11 +147,13 @@ void handle_sigint(int signum)
         if (close(serverSocket) == 0)
             printf("Welcome socket closed.\n");
     }
+    if (fclose(filePtr) == 0)
+        printf("file ptr closed.\n");
 
     exit(EXIT_SUCCESS);
 }
 
-void Accept()
+void Accept(Conn conn)
 {
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
@@ -171,25 +180,29 @@ void Accept()
         if (pid == -1)
         {
             perror("Fork failed");
-            close(clientSocket);
+            if (close(clientSocket) == 0)
+                printf("Unable to close socket.\n");
             continue;
         }
 
         if (pid > 0)
         {
             //* Parent process
-            close(clientSocket);
+            if (close(clientSocket) == 0)
+                printf("Unable to close socket.\n");
         }
         if (pid == 0)
         {
             //* Child process
-            close(serverSocket); // Close the server socket in the child process
+            if (close(serverSocket) == 0)
+                printf("Unable to close socket.\n"); // Close the server socket in the child process
 
             printf("New client connection established: socket fd=%d\n", clientSocket);
-            ldap(clientSocket);
+            ldap(clientSocket, conn.filePtr);
             printf("Comunication done closing client socket fd=%d\n", clientSocket);
 
-            close(clientSocket);
+            if (close(clientSocket) == 0)
+                printf("Unable to close socket.\n");
             exit(EXIT_SUCCESS);
         }
     }
@@ -202,7 +215,8 @@ int main(int argc, char *const argv[])
     serverSocket = CreateSocket();
     BindSocket(conn);
     Listen(conn);
-    Accept();
+    Accept(conn);
+    fclose(conn.filePtr);
     close(serverSocket);
     return 1;
 }

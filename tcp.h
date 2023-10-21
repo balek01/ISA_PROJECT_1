@@ -7,13 +7,13 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 3, 2023
+ *  Last modified: Oct 21, 2023
  *
  *
  */
 
-#ifndef TCP_H
-#define TCP_H
+#ifndef _TCP_H
+#define _TCP_H
 
 /**
  * Maximum of users that can be connected to the server
@@ -37,7 +37,8 @@ int DEFAULT_PORT = 389;
 typedef struct
 {
     int port;
-    char *file;
+    char *filePath;
+    FILE *filePtr;
 
 } Conn;
 
@@ -61,7 +62,6 @@ int CreateSocket();
 
 /**
  * Bind any address on the socket with specified port
- *  @param server_socket File descriptor of BSD socket
  *  @param conn Conn structure containig connection information
  *
  */
@@ -70,7 +70,6 @@ void BindSocket(Conn conn);
 /**
  * Listen for incoming connections
  *
- *  @param server_socket File descriptor of BSD socket
  *  @param conn Conn structure containig connection information
  *
  */
@@ -79,11 +78,9 @@ void Listen(Conn conn);
 /**
  * Accept connection from client
  * Creates new process using fork and new client socket
- *
- *  @param server_socket File descriptor of BSD socket
  *  @param conn Conn structure containig connection information
  *
  */
-void Accept();
+void Accept(Conn conn);
 
 #endif
