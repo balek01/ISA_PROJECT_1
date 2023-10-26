@@ -21,11 +21,9 @@
 #include <string.h>
 #include <stdbool.h>
 #include <sys/socket.h>
-#include <sys/types.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+
 #include "tcp.h"
 
 volatile int ctrl_c_received = false;
@@ -179,30 +177,34 @@ void Accept(Conn conn)
         pid = fork();
         if (pid == -1)
         {
+            pid = getpid();
             perror("Fork failed");
-            if (close(clientSocket) == 0)
-                printf("Unable to close socket.\n");
+            if (close(clientSocket) == -1)
+                printf("Unable to close socket. %d\n", (int)pid);
             continue;
         }
 
         if (pid > 0)
         {
+            pid = getpid();
             //* Parent process
-            if (close(clientSocket) == 0)
-                printf("Unable to close socket.\n");
+            if (close(clientSocket) == -1)
+                printf("Unable to close socket. %d\n", (int)pid);
         }
         if (pid == 0)
         {
+            pid = getpid();
             //* Child process
-            if (close(serverSocket) == 0)
-                printf("Unable to close socket.\n"); // Close the server socket in the child process
+            if (close(serverSocket) == -1)
+                printf("Unable to close socket. %d\n", (int)pid); // Close the server socket in the child process
 
             printf("New client connection established: socket fd=%d\n", clientSocket);
             ldap(clientSocket, conn.filePtr);
             printf("Comunication done closing client socket fd=%d\n", clientSocket);
 
-            if (close(clientSocket) == 0)
-                printf("Unable to close socket.\n");
+            if (close(clientSocket) == -1)
+                printf("Unable to close socket. %d\n", (int)pid);
+
             exit(EXIT_SUCCESS);
         }
     }
