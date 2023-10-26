@@ -7,7 +7,7 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 21, 2023
+ *  Last modified: Oct 26, 2023
  *
  *
  */
@@ -28,27 +28,30 @@ enum CSVOffset
 
 enum LDAPPrtotocolOp
 {
-    LDAP_BIND_REQUEST = 0x60,         // 96
-    LDAP_BIND_RESPONSE = 0x61,        // 97
-    LDAP_UNBIND_REQUEST = 0x42,       // 66
-    LDAP_SEARCH_REQUEST = 0x63,       // 99
-    LDAP_SEARCH_RESPONSE = 0x64,      // 100
-    LDAP_MODIFY_REQUEST = 0x66,       // 102
-    LDAP_MODIFY_RESPONSE = 0x67,      // 103
-    LDAP_ADD_REQUEST = 0x68,          // 104
-    LDAP_ADD_RESPONSE = 0x69,         // 105
-    LDAP_DELETE_REQUEST = 0x4A,       // 74
-    LDAP_DELETE_RESPONSE = 0x6B,      // 107
-    LDAP_MODIFY_DN_REQUEST = 0x6C,    // 108
-    LDAP_MODIFY_DN_RESPONSE = 0x6D,   // 109
-    LDAP_COMPARE_REQUEST = 0x6E,      // 110
-    LDAP_COMPARE_RESPONSE = 0x6F,     // 111
-    LDAP_ABANDON_REQUEST = 0x50,      // 80
-    LDAP_SEARCH_RESULT_ENTRY = 0x64,  // 100
-    LDAP_SEARCH_RESULT_DONE = 0x65,   // 101
-    LDAP_EXTENDED_REQUEST = 0x77,     // 119
-    LDAP_EXTENDED_RESPONSE = 0x78,    // 120
-    LDAP_INTERMEDIATE_RESPONSE = 0x79 // 121
+    LDAP_BIND_REQUEST = 0x60,          // 96
+    LDAP_BIND_RESPONSE = 0x61,         // 97
+    LDAP_UNBIND_REQUEST = 0x42,        // 66
+    LDAP_SEARCH_REQUEST = 0x63,        // 99
+    LDAP_SEARCH_RESPONSE = 0x64,       // 100
+    LDAP_MODIFY_REQUEST = 0x66,        // 102
+    LDAP_MODIFY_RESPONSE = 0x67,       // 103
+    LDAP_ADD_REQUEST = 0x68,           // 104
+    LDAP_ADD_RESPONSE = 0x69,          // 105
+    LDAP_DELETE_REQUEST = 0x4A,        // 74
+    LDAP_DELETE_RESPONSE = 0x6B,       // 107
+    LDAP_MODIFY_DN_REQUEST = 0x6C,     // 108
+    LDAP_MODIFY_DN_RESPONSE = 0x6D,    // 109
+    LDAP_COMPARE_REQUEST = 0x6E,       // 110
+    LDAP_COMPARE_RESPONSE = 0x6F,      // 111
+    LDAP_ABANDON_REQUEST = 0x50,       // 80
+    LDAP_SEARCH_RESULT_ENTRY = 0x64,   // 100
+    LDAP_SEARCH_RESULT_DONE = 0x65,    // 101
+    LDAP_EXTENDED_REQUEST = 0x77,      // 119
+    LDAP_EXTENDED_RESPONSE = 0x78,     // 120
+    LDAP_INTERMEDIATE_RESPONSE = 0x79, // 121
+    LDAP_PARTIAL_ATTRIBUTE_LIST = 0x30,
+    LDAP_PARTIAL_ATTRIBUTE_LIST_VALUE = 0x31,
+    LDAP_PLACEHOLDER = 0x00
 };
 
 enum TagType
@@ -88,6 +91,13 @@ enum SubstringType
     INFIX = 0x81,
     POSTFIX = 0x82
 };
+
+typedef struct
+{
+    char *uid;
+    char *cn;
+    char *mail;
+} FileLine;
 
 /**
  * Structure representing an LDAP Bind message.
@@ -135,31 +145,6 @@ typedef struct
 } LdapSearch;
 
 /**
- * Structure representing the result of an LDAP operation.
- *
- * The LDAPResult structure is used to store the result of an LDAP operation,
- * including a result code, matched distinguished name (DN), and diagnostic message.
- */
-typedef struct
-{
-    uint8_t resultCode;          /**< The result code indicating the outcome of the LDAP operation. */
-    char matchedDN[128];         /**< The distinguished name (DN) that matched the LDAP operation. Adjust size as needed. */
-    char diagnosticMessage[128]; /**< A diagnostic message providing additional information. Adjust size as needed. */
-} LDAPResult;
-
-/**
- * Structure representing the response to an LDAP Bind operation.
- *
- * The BindResponse structure is used to represent the response to an LDAP Bind operation,
- * including an LDAP result and an optional field for server SASL credentials.
- */
-typedef struct
-{
-    LDAPResult ldapResult;     /**< The result of the LDAP Bind operation. */
-    char serverSaslCreds[128]; /**< Optional server SASL credentials. Adjust size as needed. */
-} BindResponse;
-
-/**
  * Structure representing LDAP element information.
  *
  * The LdapElementInfo structure is used to store detailed information about an LDAP element.
@@ -204,7 +189,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes);
  */
 int ldap_parse_request(unsigned char *data, size_t length, int clientSocket, FILE *file);
 
-LdapBind ldap_bind(unsigned char *data, int message_id);
+LdapBind ldap_bind(unsigned char *data, int messageId);
 
 /**
  * Print a hexadecimal representation of received data.
@@ -297,6 +282,10 @@ void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int 
 void add_ldap_string(unsigned char *buff, int *offset, char *string);
 int get_targeted_column(LdapFilter filter);
 void add_integer(unsigned char *buff, int *offset, int value);
-void ldap_add_search_matches(unsigned char *buff, int *offset, LdapFilter filter, FILE *file);
+bool is_token_equal_filter_value(LdapFilter filter, char *token);
+void ldap_send_search_res_entry(unsigned char *buff, int *offset, FileLine fl, int clientSocket);
+void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapFilter filter, FILE *file, int clientSocket);
+void add_ldap_attribute_list(unsigned char *buff, int *offset, char *type, char *value);
+void removeEOL(char *str);
 
 #endif
