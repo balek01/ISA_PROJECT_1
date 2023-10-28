@@ -84,7 +84,7 @@ void ldap_search_response(LdapSearch search, int clientSocket, FILE *file);
 void print_ldap_search(LdapSearch search);
 bool is_token_equal_filter_value(LdapFilter filter, char *token);
 void ldap_send_search_res_entry(unsigned char *buff, int *offset, FileLine fl, int clientSocket);
-void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapFilter filter, FILE *file, int clientSocket);
+void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapSearch *search, FILE *file, int clientSocket);
 void add_ldap_attribute_list(unsigned char *buff, int *offset, char *type, char *value);
 void removeEOL(char *str);
 int get_targeted_column(LdapFilter filter);

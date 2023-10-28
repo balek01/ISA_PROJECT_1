@@ -51,7 +51,7 @@ void ldap_search_response(LdapSearch search, int clientSocket, FILE *file)
     }
     else
     {
-        ldap_send_search_res_entrys(buff, &offset, search.filter, file, clientSocket);
+        ldap_send_search_res_entrys(buff, &offset, &search, file, clientSocket);
         offset = 0;
         memset(buff, 0, MAX_BUFFER_SIZE); // clear the buffer
         create_ldap_header(buff, &offset, search.messageId);
@@ -66,22 +66,30 @@ void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int 
     add_ldap_byte(buff, offset, LDAP_PLACEHOLDER); // placeholder
     add_ldap_byte(buff, offset, ENUMERATED_TYPE);
     add_ldap_byte(buff, offset, 0x01);
-    if (returnCode == SUCCESS)
+
+    switch (returnCode)
     {
+    case SUCCESS:
         add_ldap_byte(buff, offset, SUCCESS);
-
         add_ldap_string(buff, offset, "");
-
         add_ldap_string(buff, offset, "");
-    }
-
-    if (returnCode == UNSUPORTED_FILTER)
-    {
+        break;
+    case UNSUPORTED_FILTER:
         add_ldap_byte(buff, offset, UNWILLING_TO_PERFORM);
-
         add_ldap_string(buff, offset, "");
-
         add_ldap_string(buff, offset, "Usage of unsupported filter.");
+        break;
+    case SIZE_LIMIT_EXCEEDED:
+        add_ldap_byte(buff, offset, SIZE_LIMIT_EXCEEDED);
+        add_ldap_string(buff, offset, "");
+        add_ldap_string(buff, offset, "Size limit exceeded.");
+        break;
+
+    default:
+        add_ldap_byte(buff, offset, UNWILLING_TO_PERFORM);
+        add_ldap_string(buff, offset, "");
+        add_ldap_string(buff, offset, "Internal error.");
+        break;
     }
     buff[resultLengthOffset] = (*offset) - resultLengthOffset - 1;
     buff[1] = (*offset) - 2;
@@ -108,15 +116,16 @@ int get_targeted_column(LdapFilter filter)
     if (strcmp(filter.attributeDescription, "mail") == 0)
         return MAIL;
 
-    printf("Unknown attribute");
+    printf("ERROR: Unknown ldap filter attribute");
     return -1;
 }
-void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapFilter filter, FILE *file, int clientSocket)
+void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapSearch *search, FILE *file, int clientSocket)
 {
     char line[1024];
     char fullLine[1024];
     char *saveptr; // Used to maintain the tokenizer state
-    int targetColumn = get_targeted_column(filter);
+    int targetColumn = get_targeted_column(search->filter);
+    int numberOfEntries = 0;
     rewind(file);
 
     while (fgets(line, sizeof(line), file))
@@ -130,8 +139,13 @@ void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapFilter fi
             removeEOL(token);
             if (column == targetColumn)
             {
-                if (is_token_equal_filter_value(filter, token))
+                if (is_token_equal_filter_value(search->filter, token))
                 {
+                    if (search->sizeLimit != 0 && numberOfEntries == search->sizeLimit)
+                    {
+                        search->returnCode = SIZE_LIMIT_EXCEEDED;
+                        return;
+                    }
                     token = strtok_r(fullLine, ";", &saveptr);
                     FileLine fl;
 
@@ -149,7 +163,8 @@ void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapFilter fi
                         removeEOL(token);
                         fl.mail = token;
                     }
-                    ldap_send_search_res_entry(buff, offset, fl, clientSocket); // todo SIZE limit
+                    numberOfEntries++;
+                    ldap_send_search_res_entry(buff, offset, fl, clientSocket);
                 }
                 break;
             }
@@ -243,7 +258,7 @@ LdapFilter get_ldap_filter(unsigned char *data, LdapSearch *search)
 
     if (filter.filterType != EQUALITY_MATCH_FILTER && filter.filterType != SUBSTRING_FILTER)
     { // suported filters
-        printf("ERROR unsupported filter %02X \n", filter.filterType);
+        printf("Received unsupported filter %02X \n", filter.filterType);
         search->returnCode = UNSUPORTED_FILTER;
         filter.attributeDescription = NULL;
         filter.attributeValue = NULL;
