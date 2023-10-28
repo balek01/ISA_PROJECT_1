@@ -9,11 +9,20 @@
  */
 typedef struct
 {
-    int messageId; /**< The unique identifier for the LDAP Bind message. */
-    int version;   /**< The protocol version associated with the LDAP Bind message. */
+    int messageId;  /**< The unique identifier for the LDAP Bind message. */
+    int version;    /**< The protocol version associated with the LDAP Bind message. */
+    char *name;     /**< The distinguished name associated with the LDAP Bind message. */
+    int authChoice; /**<*/
 } LdapBind;
 
-LdapBind ldap_bind(unsigned char *data, int messageId);
+enum AuthChoice
+{
+    SIMPLE_BIND = 0x80,
+    SASL_AUTH = 0xA3
+};
+
+LdapBind
+ldap_bind(unsigned char *data, int messageId);
 
 /**
  * Send an LDAP Bind response to the client.

@@ -29,10 +29,8 @@ LdapBind ldap_bind(unsigned char *data, int messageId)
     LdapBind bind;
     bind.messageId = messageId;
     bind.version = get_int_value(data);
-
-    printf("Message id: %d\n", bind.messageId);
-    printf("Version: %d\n", bind.version);
-
+    bind.name = get_string_value(data);
+    bind.authChoice = get_ldap_element_info(data).tagValue;
     return bind;
 }
 
@@ -51,13 +49,21 @@ void ldap_bind_response(LdapBind bind, int clientSocket)
     add_ldap_byte(buff, &offset, ENUMERATED_TYPE);
     add_ldap_byte(buff, &offset, 0x01);
 
-    if (bind.version == 0x03)
+    if (bind.authChoice != SIMPLE_BIND)
     {
-        add_ldap_byte(buff, &offset, SUCCESS);
+        add_ldap_byte(buff, &offset, AUTH_METHOD_NOT_SUPPORTED);
+    }
+    else if (bind.version != 0x03)
+    {
+        add_ldap_byte(buff, &offset, PROTOCOL_ERROR);
+    }
+    else if (strcmp(bind.name, "") != 0)
+    {
+        add_ldap_byte(buff, &offset, INVALID_DN_SYNTAX);
     }
     else
     {
-        add_ldap_byte(buff, &offset, PROTOCOL_ERROR);
+        add_ldap_byte(buff, &offset, SUCCESS);
     }
 
     add_ldap_string(buff, &offset, "");
@@ -66,6 +72,7 @@ void ldap_bind_response(LdapBind bind, int clientSocket)
 
     buff[LDAP_MSG_LENGTH_OFFSET] = offset - 2; // ldap msg tag, and length
     ldap_send(buff, clientSocket, offset);
+    free(bind.name);
 
     print_hex_message(buff, offset);
 }
