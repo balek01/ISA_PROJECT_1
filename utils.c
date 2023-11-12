@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include "utils.h"
 
 extern int currentTagPosition;
@@ -143,6 +144,17 @@ void print_ldap_element_info(LdapElementInfo elementInfo)
     printf("Start: %d\n", elementInfo.start);
     printf("End: %d\n", elementInfo.end);
     printf("New Tag Position: %d\n\n", elementInfo.nextTagPosition);
+}
+
+void debug_msg(int level, const char *format, ...)
+{
+    if (DEBUG >= level)
+    {
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+    }
 }
 
 char *get_string_value(unsigned char *data)

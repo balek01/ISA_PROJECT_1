@@ -7,7 +7,8 @@ enum MyConst
     LDAP_MESSAGE_PREFIX = 0x30,
     MAX_BUFFER_SIZE = 2048,
     LDAP_MSG_LENGTH_OFFSET = 1,
-    LDAP_PLACEHOLDER = 0x00
+    LDAP_PLACEHOLDER = 0x00,
+    DEBUG = 1
 };
 
 enum SubstringType
@@ -158,4 +159,5 @@ void add_ldap_string(unsigned char *buff, int *offset, char *string);
 void add_ldap_oid(unsigned char *buff, int *offset, char *string);
 
 void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int clientSocket);
+void debug_msg(int level, const char *format, ...);
 #endif
