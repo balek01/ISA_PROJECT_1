@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -Wall -g 
 
 # List of source files
-SRC = ldap.c tcp.c
+SRC = utils.c bind.c search.c ldap.c tcp.c 
 # Generate a list of object files from source files
 OBJ = $(SRC:.c=.o)
 

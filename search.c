@@ -17,7 +17,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include "ldap.h"
-#include "utils.c"
+#include "utils.h"
 #include "search.h"
 
 extern int currentTagPosition;
@@ -203,7 +203,7 @@ void ldap_send_search_res_entry(unsigned char *buff, int *offset, FileLine fl, i
 
     newbuff[resultLengthOffset] = newoffset - resultLengthOffset - 1;
     newbuff[attributeListoffset] = newoffset - attributeListoffset - 1;
-    newbuff[1] = newoffset - 2;
+    newbuff[LDAP_MSG_LENGTH_OFFSET] = newoffset - 2;
     ldap_send(newbuff, clientSocket, newoffset);
 }
 void add_ldap_attribute_list(unsigned char *buff, int *offset, char *type, char *value)

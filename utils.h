@@ -52,6 +52,7 @@ enum ResultCode
     UNSUPORTED_FILTER = 5,
     AUTH_METHOD_NOT_SUPPORTED = 7,
     INVALID_DN_SYNTAX = 34,
+    UNAVAILABLE = 52,
     UNWILLING_TO_PERFORM = 53
 };
 enum TagType
@@ -62,7 +63,8 @@ enum TagType
     BIT_STRING_TYPE = 0x03,
     OCTET_STRING_TYPE = 0x04,
     NULL_TYPE = 0x05,
-    ENUMERATED_TYPE = 0x0A
+    ENUMERATED_TYPE = 0x0A,
+    EXTENDED_RESPONSE_OID = 0x8A
 };
 
 /**
@@ -153,5 +155,7 @@ void add_integer(unsigned char *buff, int *offset, int value);
 void set_application_type(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue);
 void set_universal_type(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue);
 void add_ldap_string(unsigned char *buff, int *offset, char *string);
+void add_ldap_oid(unsigned char *buff, int *offset, char *string);
+
 void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int clientSocket);
 #endif

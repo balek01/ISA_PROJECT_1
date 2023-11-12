@@ -27,15 +27,14 @@ int currentTagPosition;
 
 int ldap_handle_request(unsigned char *data, size_t length, int clientSocket, FILE *file)
 {
-    LdapElementInfo elementInfo = get_ldap_element_info(data);
-
-    if (elementInfo.tagValue != LDAP_MESSAGE_PREFIX)
+    if (length < 5)
     {
-        printf("ERROR Received not an ldap message\n");
+        ldap_notice_of_disconnection(clientSocket);
+        printf("Received an unknown or unsupported operation.\n");
         return -1;
     }
-    if (length < 5)
-        return -1;
+
+    LdapElementInfo elementInfo = get_ldap_element_info(data);
 
     int messageId = get_int_value(data);
     elementInfo = get_ldap_element_info(data);
@@ -56,23 +55,48 @@ int ldap_handle_request(unsigned char *data, size_t length, int clientSocket, FI
         break;
     case LDAP_UNBIND_REQUEST:
         printf("Received a Unbind Request.\n");
-        return 1;
+        return -1;
         break;
 
         // TODO: Implement rest of operations
 
     default:
+        ldap_notice_of_disconnection(clientSocket);
         printf("Received an unknown or unsupported operation.\n");
+        return -1;
     }
 
     return 0;
+}
+
+void ldap_notice_of_disconnection(int clientSocket)
+{
+    int offset = 0;
+    unsigned char buff[MAX_BUFFER_SIZE];
+    memset(buff, 0, MAX_BUFFER_SIZE); // clear the buffer
+
+    create_ldap_header(buff, &offset, 0);
+    add_ldap_byte(buff, &offset, LDAP_EXTENDED_RESPONSE);
+    int extendedResponseOffset = offset;
+    add_ldap_byte(buff, &offset, LDAP_PLACEHOLDER);
+
+    add_ldap_byte(buff, &offset, ENUMERATED_TYPE);
+    add_ldap_byte(buff, &offset, 1);
+    add_ldap_byte(buff, &offset, UNAVAILABLE);
+
+    add_ldap_string(buff, &offset, "");
+    add_ldap_string(buff, &offset, "Received an unknown or unsupported operation.");
+    add_ldap_oid(buff, &offset, "1.3.6.1.4.1.1466.20036");
+    buff[LDAP_MSG_LENGTH_OFFSET] = offset - 2; // ldap msg tag, and length
+    buff[extendedResponseOffset] = offset - extendedResponseOffset - 1;
+    ldap_send(buff, clientSocket, offset);
 }
 
 void ldap(int clientSocket, FILE *file)
 {
     size_t receivedBytes;
     int recivedDataCode = 0;
-    while (recivedDataCode != 1)
+    while (recivedDataCode != -1)
     {
         unsigned char *receivedData = ldap_receive(clientSocket, &receivedBytes);
         printf("Received data from client.\n");
@@ -80,12 +104,6 @@ void ldap(int clientSocket, FILE *file)
 
         currentTagPosition = 0;
         recivedDataCode = ldap_handle_request(receivedData, receivedBytes, clientSocket, file);
-        if (recivedDataCode == -1)
-        {
-            printf("Error parsing \n");
-            free(receivedData);
-            return;
-        }
         // Free the allocated memory for receivedData
         free(receivedData);
     }

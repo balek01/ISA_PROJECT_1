@@ -24,12 +24,19 @@ void add_integer(unsigned char *buff, int *offset, int value)
     }
 
     add_ldap_byte(buff, offset, INTEGER_TYPE);
-    add_ldap_byte(buff, offset, numBytes);
-
-    // Add the integer data bytes (in big-endian byte order)
-    for (int i = numBytes; i > 0; i--)
+    if (value == 0)
     {
-        add_ldap_byte(buff, offset, (value >> ((i - 1) * 8)) & 0xFF); // 0xff mask to show only the lowest byte
+        add_ldap_byte(buff, offset, 1);
+        add_ldap_byte(buff, offset, 0);
+    }
+    else
+    {
+        add_ldap_byte(buff, offset, numBytes);
+        // Add the integer data bytes (in big-endian byte order)
+        for (int i = numBytes; i > 0; i--)
+        {
+            add_ldap_byte(buff, offset, (value >> ((i - 1) * 8)) & 0xFF); // 0xff mask to show only the lowest byte
+        }
     }
 }
 
@@ -43,6 +50,17 @@ void add_ldap_string(unsigned char *buff, int *offset, char *string)
 {
     int lenght = strlen(string);
     add_ldap_byte(buff, offset, OCTET_STRING_TYPE);
+    add_ldap_byte(buff, offset, lenght);
+    for (size_t i = 0; i < lenght; i++)
+    {
+        add_ldap_byte(buff, offset, string[i]);
+    }
+}
+
+void add_ldap_oid(unsigned char *buff, int *offset, char *string)
+{
+    int lenght = strlen(string);
+    add_ldap_byte(buff, offset, EXTENDED_RESPONSE_OID);
     add_ldap_byte(buff, offset, lenght);
     for (size_t i = 0; i < lenght; i++)
     {
@@ -114,14 +132,12 @@ void get_long_length_info(unsigned char *data, LdapElementInfo *elementInfo, int
     elementInfo->lengthOfData = 0;
     for (int i = currentTagPosition + 2; i <= elementInfo->start; i++)
     {
-
         elementInfo->lengthOfData = elementInfo->lengthOfData * 256 + (int)data[i];
     }
 }
 
 void print_ldap_element_info(LdapElementInfo elementInfo)
 {
-
     printf("Tag Value: %02X\n", elementInfo.tagValue);
     printf("Length of Data: %d\n", elementInfo.lengthOfData);
     printf("Start: %d\n", elementInfo.start);

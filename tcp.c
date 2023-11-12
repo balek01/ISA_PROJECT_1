@@ -154,12 +154,12 @@ void handle_sigint(int signum)
 }
 
 void Accept(Conn conn)
-{
+{ 
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
 
     while (1)
-    {
+    { 
         //? may not even be necessary
         if (ctrl_c_received)
         {
@@ -258,7 +258,7 @@ int main(int argc, char *const argv[])
     signal(SIGINT, handle_sigint);
     Conn conn = ParseArgs(argc, argv);
     serverSocket = CreateSocket();
-    BindSocket(conn);
+    BindSocket(conn); 
     Listen(conn);
     Accept(conn);
     fclose(conn.filePtr);

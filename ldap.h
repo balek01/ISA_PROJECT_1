@@ -45,4 +45,6 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes);
  */
 int ldap_handle_request(unsigned char *data, size_t length, int clientSocket, FILE *file);
 
+void add_ldap_oid(unsigned char *buff, int *offset, char *string);
+void ldap_notice_of_disconnection(int clientSocket);
 #endif
