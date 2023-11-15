@@ -116,7 +116,7 @@ int get_targeted_column(LdapFilter filter)
     if (strcmp(filter.attributeDescription, "mail") == 0)
         return MAIL;
 
-    printf("ERROR: Unknown ldap filter attribute");
+    printf("ERROR: Unknown ldap filter attribute \n");
     return -1;
 }
 void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapSearch *search, FILE *file, int clientSocket)
@@ -247,6 +247,22 @@ bool is_token_equal_filter_value(LdapFilter filter, char *token)
             match = true;
         }
     }
+    else if (filter.substringType == ANY_CENTER)
+    {
+
+        int tokenLen = strlen(token);
+        int valueLen = strlen(filter.attributeValue2);
+        bool found = false;
+
+        if (tokenLen >= valueLen && strcmp(filter.attributeValue2, token + (tokenLen - valueLen)) == 0)
+        {
+            found = true;
+        }
+        if (found && strncmp(filter.attributeValue, token, strlen(filter.attributeValue)) == 0)
+        {
+            match = true;
+        }
+    }
 
     return match;
 };
@@ -255,6 +271,7 @@ LdapFilter get_ldap_filter(unsigned char *data, LdapSearch *search)
 {
     LdapFilter filter;
     filter.filterType = get_ldap_element_info(data).tagValue;
+    filter.attributeValue2 = NULL;
 
     if (filter.filterType != EQUALITY_MATCH_FILTER && filter.filterType != SUBSTRING_FILTER)
     { // suported filters
@@ -276,6 +293,11 @@ LdapFilter get_ldap_filter(unsigned char *data, LdapSearch *search)
         get_ldap_element_info(data);
         filter.substringType = data[currentTagPosition];
         filter.attributeValue = get_string_value(data);
+        if (data[currentTagPosition] == POSTFIX)
+        {
+            filter.substringType = ANY_CENTER;
+            filter.attributeValue2 = get_string_value(data);
+        }
     }
 
     return filter;
@@ -301,4 +323,5 @@ void print_ldap_search(LdapSearch search)
     printf("Filter type: %02X\n", search.filter.filterType);
     printf("Filter attribute description: %s\n", search.filter.attributeDescription);
     printf("Filter attribute value: %s\n", search.filter.attributeValue);
+     printf("Filter attribute value2: %s\n", search.filter.attributeValue2);
 }

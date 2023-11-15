@@ -15,7 +15,8 @@ enum SubstringType
 {
     PREFIX = 0x80,
     INFIX = 0x81,
-    POSTFIX = 0x82
+    POSTFIX = 0x82,
+    ANY_CENTER = 0x83 // made up value for xxx*xxx filters
 };
 
 enum LDAPPrtotocolOp

@@ -54,6 +54,7 @@ typedef struct
 {
     char *attributeDescription; /**< The description of the attribute being filtered. */
     char *attributeValue;       /**< The value used for the filter. */
+    char *attributeValue2;      /**< The second value used for the filter. */
     enum FilterType filterType; /**< The type of filter (e.g., equality, presence, etc.). */
     enum SubstringType substringType;
 } LdapFilter;
