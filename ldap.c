@@ -58,8 +58,6 @@ int ldap_handle_request(unsigned char *data, size_t length, int clientSocket, FI
         return -1;
         break;
 
-        // TODO: Implement rest of operations
-
     default:
         ldap_notice_of_disconnection(clientSocket);
         printf("Received an unknown or unsupported operation.\n");

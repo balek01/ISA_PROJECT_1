@@ -225,7 +225,7 @@ void add_ldap_attribute_list(unsigned char *buff, int *offset, char *type, char 
 };
 
 bool is_token_equal_filter_value(LdapFilter filter, char *token)
-{ // TODO: substring not working correctly for multiple *
+{ // ! substring not working correctly for multiple *
     bool match = false;
 
     if (filter.filterType == EQUALITY_MATCH_FILTER && strcmp(filter.attributeValue, token) == 0)

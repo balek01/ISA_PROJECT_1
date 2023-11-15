@@ -62,14 +62,12 @@ Conn ParseArgs(int argc, char *const argv[])
         exit(EXIT_FAILURE);
     }
 
-    // TODO: test if this check works properly
     if (conn.port < 0 || conn.port > 65536)
     {
         fprintf(stderr, "Port %d is out of range (0-65536)\n", conn.port);
         exit(EXIT_FAILURE);
     }
 
-    // TODO:: check if file path exists and file is .csv
     conn.filePtr = fopen(conn.filePath, "r");
     filePtr = conn.filePtr;
     if (conn.filePtr == NULL)
@@ -233,7 +231,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
     if (bytesReceived < 0)
     {
         perror("recv");
-        exit(1); // TODO
+        exit(1); 
     }
 
     // Allocate memory for the received data
@@ -241,7 +239,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
     if (receivedData == NULL)
     {
         perror("malloc");
-        exit(1); // TODO
+        exit(1); 
     }
 
     // Copy the received data to the allocated array
