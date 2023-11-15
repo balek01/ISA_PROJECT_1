@@ -186,6 +186,9 @@ void removeEOL(char *str)
 void ldap_send_search_res_entry(unsigned char *buff, int *offset, FileLine fl, int clientSocket)
 {
 
+    char uid[100];
+    strcpy(uid, fl.uid);  
+    strcat(uid,",dc=fit,dc=vut,dc=cz");
     int newoffset = (*offset);
     unsigned char newbuff[MAX_BUFFER_SIZE]; // coppy header
     memset(newbuff, 0, MAX_BUFFER_SIZE);    // clear the buffer
@@ -194,7 +197,7 @@ void ldap_send_search_res_entry(unsigned char *buff, int *offset, FileLine fl, i
     add_ldap_byte(newbuff, &newoffset, LDAP_SEARCH_RESULT_ENTRY);
     int resultLengthOffset = newoffset;
     add_ldap_byte(newbuff, &newoffset, LDAP_PLACEHOLDER);
-    add_ldap_string(newbuff, &newoffset, fl.uid);
+    add_ldap_string(newbuff, &newoffset, uid);
     add_ldap_byte(newbuff, &newoffset, LDAP_PARTIAL_ATTRIBUTE_LIST);
     int attributeListoffset = newoffset;
     add_ldap_byte(newbuff, &newoffset, LDAP_PLACEHOLDER);
