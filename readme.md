@@ -6,7 +6,6 @@ The project implements a simplified server for the LDAP protocol. The program es
 
 ## Known Limitations 
 Server supports only equality match filters and substring filters. If a substring filter with multiple * is used the server behaves as if it received a prefix filter and ignores the rest of upcoming filters. 
-Since this functionality is not implemented it has not been tested.
 
 ## Example of usage 
 ```
