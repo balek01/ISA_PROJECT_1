@@ -1,4 +1,14 @@
-
+/**
+ *
+ * @file bind.h
+ *
+ * @brief Project: ISA LDAP server
+ *
+ * @author xbalek02 Miroslav Bálek
+ *
+ *
+ *
+ */
 #ifndef _BIND_H
 #define _BIND_H
 /**

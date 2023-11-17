@@ -7,13 +7,11 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 21, 2023
  *  @bug If server is closed using C-c and no client has connected to server yet
  *  debug messages says that client socket was closed instead of welcome socket. But welcome socket was closed correctly.
  *
  */
 
-// fdd3:ce44:9703:0::1/64
 
 #include <stdio.h>
 #include <signal.h>

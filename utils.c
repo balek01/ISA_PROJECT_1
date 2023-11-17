@@ -1,3 +1,15 @@
+/**
+ *
+ * @file utils.c
+ *
+ * @brief Project: ISA LDAP server
+ *
+ * @author xbalek02 Miroslav Bálek
+ *
+ *
+ *
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -7,7 +7,6 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 21, 2023
  *
  *
  */

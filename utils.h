@@ -1,4 +1,14 @@
-
+/**
+ *
+ * @file utils.h
+ *
+ * @brief Project: ISA LDAP server
+ *
+ * @author xbalek02 Miroslav Bálek
+ *
+ *
+ *
+ */
 #ifndef _UTILS_H
 #define _UTILS_H
 
