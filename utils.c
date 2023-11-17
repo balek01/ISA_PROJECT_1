@@ -87,7 +87,7 @@ LdapElementInfo get_ldap_element_info(unsigned char *data)
     {
         set_universal_type(data, &elementInfo, lengthValue);
     }
-    //     print_ldap_element_info(elementInfo);
+    print_ldap_element_info(elementInfo);
     currentTagPosition = elementInfo.nextTagPosition;
     return elementInfo;
 }
@@ -139,16 +139,16 @@ void get_long_length_info(unsigned char *data, LdapElementInfo *elementInfo, int
 
 void print_ldap_element_info(LdapElementInfo elementInfo)
 {
-    printf("Tag Value: %02X\n", elementInfo.tagValue);
-    printf("Length of Data: %d\n", elementInfo.lengthOfData);
-    printf("Start: %d\n", elementInfo.start);
-    printf("End: %d\n", elementInfo.end);
-    printf("New Tag Position: %d\n\n", elementInfo.nextTagPosition);
+    debug(3, "Tag Value: %02X\n", elementInfo.tagValue);
+    debug(3, "Length of Data: %d\n", elementInfo.lengthOfData);
+    debug(3, "Start: %d\n", elementInfo.start);
+    debug(3, "End: %d\n", elementInfo.end);
+    debug(3, "New Tag Position: %d\n\n", elementInfo.nextTagPosition);
 }
 
-void debug_msg(int level, const char *format, ...)
+void debug(int level, const char *format, ...)
 {
-    if (DEBUG >= level)
+    if (DEBUG_LEVEL >= level)
     {
         va_list args;
         va_start(args, format);
@@ -175,7 +175,7 @@ char *get_string_value(unsigned char *data)
     else
     {
         printf("Allocation failed.");
-        return NULL; // Return an error indicator or handle the error as needed
+        return NULL; // Return an error indicator
     }
 }
 
@@ -206,7 +206,7 @@ void print_hex_message(const unsigned char *data, size_t length)
 {
     for (size_t i = 0; i < length; i++)
     {
-        printf("%02X ", data[i]); // Print each byte in hexadecimal format
+        debug(2, "%02X ", data[i]); // Print each byte in hexadecimal format
     }
-    printf("\n");
+    debug(2, "\n\n");
 }

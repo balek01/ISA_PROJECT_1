@@ -25,7 +25,7 @@ extern int currentTagPosition;
 
 LdapBind ldap_bind(unsigned char *data, int messageId)
 {
-    printf("\n****BIND REQUEST****\n");
+    debug(1, "****BIND REQUEST****\n");
     LdapBind bind;
     bind.messageId = messageId;
     bind.version = get_int_value(data);
@@ -36,7 +36,7 @@ LdapBind ldap_bind(unsigned char *data, int messageId)
 
 void ldap_bind_response(LdapBind bind, int clientSocket)
 {
-    printf("\n****BIND RESPONSE****\n");
+    debug(1, "****BIND RESPONSE****\n");
     int offset = 0;
     unsigned char buff[MAX_BUFFER_SIZE];
     memset(buff, 0, MAX_BUFFER_SIZE); // clear the buffer

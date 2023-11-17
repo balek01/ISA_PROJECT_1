@@ -30,7 +30,7 @@ int ldap_handle_request(unsigned char *data, size_t length, int clientSocket, FI
     if (length < 5)
     {
         ldap_notice_of_disconnection(clientSocket);
-        printf("Received an unknown or unsupported operation.\n");
+        printf("Received an unknown or unsupported message.\n");
         return -1;
     }
 
@@ -42,25 +42,25 @@ int ldap_handle_request(unsigned char *data, size_t length, int clientSocket, FI
     switch (elementInfo.tagValue)
     {
     case LDAP_BIND_REQUEST:
-        printf("Received a Bind Request.\n");
         LdapBind bind = ldap_bind(data, messageId);
         ldap_bind_response(bind, clientSocket);
         break;
+
     case LDAP_SEARCH_REQUEST:
-        printf("Received a Search Request.\n");
         LdapSearch search = ldap_search(data, messageId);
         print_ldap_search(search);
         ldap_search_response(search, clientSocket, file);
         dispose_ldap_search(search);
         break;
+
     case LDAP_UNBIND_REQUEST:
-        printf("Received a Unbind Request.\n");
+        debug(1, "****UNBIND REQUEST****\n");
         return -1;
         break;
 
     default:
         ldap_notice_of_disconnection(clientSocket);
-        printf("Received an unknown or unsupported operation.\n");
+        debug(1, "Received an unknown or unsupported operation.\n");
         return -1;
     }
 
@@ -83,7 +83,7 @@ void ldap_notice_of_disconnection(int clientSocket)
     add_ldap_byte(buff, &offset, UNAVAILABLE);
 
     add_ldap_string(buff, &offset, "");
-    add_ldap_string(buff, &offset, "Received an unknown or unsupported operation.");
+    add_ldap_string(buff, &offset, "Received an unknown or unsupported message.");
     add_ldap_oid(buff, &offset, "1.3.6.1.4.1.1466.20036");
     buff[LDAP_MSG_LENGTH_OFFSET] = offset - 2; // ldap msg tag, and length
     buff[extendedResponseOffset] = offset - extendedResponseOffset - 1;
@@ -97,7 +97,7 @@ void ldap(int clientSocket, FILE *file)
     while (recivedDataCode != -1)
     {
         unsigned char *receivedData = ldap_receive(clientSocket, &receivedBytes);
-        printf("Received data from client.\n");
+        debug(1, "Received data from client:\n");
         print_hex_message(receivedData, receivedBytes);
 
         currentTagPosition = 0;

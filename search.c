@@ -23,7 +23,7 @@
 extern int currentTagPosition;
 LdapSearch ldap_search(unsigned char *data, int messageId)
 {
-    printf("\n****SEARCH REQUEST****\n");
+    debug(1, "****SEARCH REQUEST****\n");
     LdapSearch search;
     search.returnCode = SUCCESS;
     search.messageId = messageId;
@@ -39,7 +39,7 @@ LdapSearch ldap_search(unsigned char *data, int messageId)
 
 void ldap_search_response(LdapSearch search, int clientSocket, FILE *file)
 {
-    printf("\n****SEARCH RESPONSE****\n");
+     debug(1, "****SEARCH RESPONSE****\n");
     int offset = 0;
     unsigned char buff[MAX_BUFFER_SIZE];
     memset(buff, 0, MAX_BUFFER_SIZE); // clear the buffer
@@ -187,8 +187,8 @@ void ldap_send_search_res_entry(unsigned char *buff, int *offset, FileLine fl, i
 {
 
     char uid[100];
-    strcpy(uid, fl.uid);  
-    strcat(uid,",dc=fit,dc=vut,dc=cz");
+    strcpy(uid, fl.uid);
+    strcat(uid, ",dc=fit,dc=vut,dc=cz");
     int newoffset = (*offset);
     unsigned char newbuff[MAX_BUFFER_SIZE]; // coppy header
     memset(newbuff, 0, MAX_BUFFER_SIZE);    // clear the buffer
@@ -278,7 +278,7 @@ LdapFilter get_ldap_filter(unsigned char *data, LdapSearch *search)
 
     if (filter.filterType != EQUALITY_MATCH_FILTER && filter.filterType != SUBSTRING_FILTER)
     { // suported filters
-        printf("Received unsupported filter %02X \n", filter.filterType);
+        debug(1, "Received unsupported filter %02X \n", filter.filterType);
         search->returnCode = UNSUPORTED_FILTER;
         filter.attributeDescription = NULL;
         filter.attributeValue = NULL;
@@ -309,22 +309,23 @@ void dispose_ldap_search(LdapSearch search)
 {
     free(search.filter.attributeDescription);
     free(search.filter.attributeValue);
+    free(search.filter.attributeValue2);
     free(search.baseObject);
 }
 
 void print_ldap_search(LdapSearch search)
 {
-    printf("LDAP search print:\n");
-    printf("Return code: %d\n", search.returnCode);
-    printf("MessageId: %d\n", search.messageId);
-    printf("BaseObject: %s\n", search.baseObject);
-    printf("Scope: %d\n", search.scope);
-    printf("DerefAliases: %d\n", search.derefAliases);
-    printf("Size limit: %d\n", search.sizeLimit);
-    printf("Time limit: %d\n", search.timeLimit);
-    printf("TypesOnly: %d\n", search.typesOnly);
-    printf("Filter type: %02X\n", search.filter.filterType);
-    printf("Filter attribute description: %s\n", search.filter.attributeDescription);
-    printf("Filter attribute value: %s\n", search.filter.attributeValue);
-     printf("Filter attribute value2: %s\n", search.filter.attributeValue2);
+    debug(2, "LDAP search print:\n");
+    debug(2, "Return code: %d\n", search.returnCode);
+    debug(2, "MessageId: %d\n", search.messageId);
+    debug(2, "BaseObject: %s\n", search.baseObject);
+    debug(2, "Scope: %d\n", search.scope);
+    debug(2, "DerefAliases: %d\n", search.derefAliases);
+    debug(2, "Size limit: %d\n", search.sizeLimit);
+    debug(2, "Time limit: %d\n", search.timeLimit);
+    debug(2, "TypesOnly: %d\n", search.typesOnly);
+    debug(2, "Filter type: %02X\n", search.filter.filterType);
+    debug(2, "Filter attribute description: %s\n", search.filter.attributeDescription);
+    debug(2, "Filter attribute value: %s\n", search.filter.attributeValue);
+    debug(2, "Filter attribute value2: %s\n", search.filter.attributeValue2);
 }

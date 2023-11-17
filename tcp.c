@@ -110,7 +110,7 @@ void BindSocket(Conn conn)
         close(serverSocket);
         exit(EXIT_FAILURE);
     }
-    printf("Server is binded on port %d...\n", conn.port);
+    debug(1, "Server is binded on port %d...\n", conn.port);
 }
 
 void Listen(Conn conn)
@@ -123,41 +123,41 @@ void Listen(Conn conn)
         exit(EXIT_FAILURE);
     }
 
-    printf("Server is listening on port %d...\n", conn.port);
+    debug(1, "Server is listening on port %d...\n", conn.port);
 }
 
 void handle_sigint(int signum)
 {
-    printf("Received SIGINT. Closing all connections and exiting...\n");
+    debug(1, "Received SIGINT. Closing all connections and exiting...\n");
 
     // Set the ctrl_c_received flag to indicate that a Ctrl+C signal was received
     ctrl_c_received = 1;
 
     if (pid == 0)
     {
-        printf("Client socket closing..\n");
+       debug(1, "Client socket closing..\n");
         if (close(clientSocket) == 0)
-            printf("Client socket closed.\n");
+           debug(1, "Client socket closed.\n");
     }
     else
     {
-        printf("Welcome socket closing..\n");
+        debug(1, "Welcome socket closing..\n");
         if (close(serverSocket) == 0)
-            printf("Welcome socket closed.\n");
+           debug(1, "Welcome socket closed.\n");
     }
     if (fclose(filePtr) == 0)
-        printf("file ptr closed.\n");
+       debug(1, "file ptr closed.\n");
 
     exit(EXIT_SUCCESS);
 }
 
 void Accept(Conn conn)
-{ 
+{
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
 
     while (1)
-    { 
+    {
         //? may not even be necessary
         if (ctrl_c_received)
         {
@@ -198,9 +198,9 @@ void Accept(Conn conn)
             if (close(serverSocket) == -1)
                 printf("Unable to close socket. %d\n", (int)pid); // Close the server socket in the child process
 
-            printf("New client connection established: socket fd=%d\n", clientSocket);
+            debug(1, "New client connection established: socket fd=%d\n", clientSocket);
             ldap(clientSocket, conn.filePtr);
-            printf("Comunication done closing client socket fd=%d\n", clientSocket);
+            debug(1,"Comunication done closing client socket fd=%d\n", clientSocket);
 
             if (close(clientSocket) == -1)
                 printf("Unable to close socket. %d\n", (int)pid);
@@ -217,7 +217,7 @@ void ldap_send(unsigned char *bufin, int clientSocket, int offset)
     bytestx = send(clientSocket, bufin, offset, 0);
     if (bytestx < 0)
         perror("ERROR in sendto");
-    printf("Data has been sent to connected client.\n");
+    debug(1,"Data has been sent to connected client:\n");
 }
 
 unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
@@ -231,7 +231,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
     if (bytesReceived < 0)
     {
         perror("recv");
-        exit(1); 
+        exit(1);
     }
 
     // Allocate memory for the received data
@@ -239,7 +239,7 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes)
     if (receivedData == NULL)
     {
         perror("malloc");
-        exit(1); 
+        exit(1);
     }
 
     // Copy the received data to the allocated array
@@ -256,7 +256,7 @@ int main(int argc, char *const argv[])
     signal(SIGINT, handle_sigint);
     Conn conn = ParseArgs(argc, argv);
     serverSocket = CreateSocket();
-    BindSocket(conn); 
+    BindSocket(conn);
     Listen(conn);
     Accept(conn);
     fclose(conn.filePtr);
