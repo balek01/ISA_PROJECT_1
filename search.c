@@ -7,7 +7,6 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 26, 2023
  *
  */
 #include <stdio.h>
@@ -63,7 +62,7 @@ void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int 
 {
     add_ldap_byte(buff, offset, LDAP_SEARCH_RESULT_DONE);
     int resultLengthOffset = (*offset);
-    add_ldap_byte(buff, offset, LDAP_PLACEHOLDER); // placeholder
+    add_ldap_byte(buff, offset, LDAP_PLACEHOLDER);
     add_ldap_byte(buff, offset, ENUMERATED_TYPE);
     add_ldap_byte(buff, offset, 0x01);
 
@@ -152,7 +151,7 @@ void ldap_send_search_res_entrys(unsigned char *buff, int *offset, LdapSearch *s
                     // Extract commonname
                     if (token != NULL)
                         fl.cn = token;
-                    // Ignore "uid" in the middle
+                    // Extract uid
                     token = strtok_r(NULL, ";", &saveptr);
                     if (token != NULL)
                         fl.uid = token;
@@ -211,11 +210,10 @@ void ldap_send_search_res_entry(unsigned char *buff, int *offset, FileLine fl, i
 }
 void add_ldap_attribute_list(unsigned char *buff, int *offset, char *type, char *value)
 {
-
     add_ldap_byte(buff, offset, LDAP_PARTIAL_ATTRIBUTE_LIST);
     int partialListOffset = (*offset);
-    add_ldap_byte(buff, offset, LDAP_PLACEHOLDER);
-    add_ldap_string(buff, offset, type);
+    add_ldap_byte(buff, offset, LDAP_PLACEHOLDER);  
+    add_ldap_string(buff, offset, type);   
     add_ldap_byte(buff, offset, LDAP_PARTIAL_ATTRIBUTE_LIST_VALUE);
     int partialListValueOffset = (*offset);
     add_ldap_byte(buff, offset, LDAP_PLACEHOLDER);

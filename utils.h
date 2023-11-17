@@ -18,7 +18,7 @@ enum MyConst
     MAX_BUFFER_SIZE = 2048,
     LDAP_MSG_LENGTH_OFFSET = 1,
     LDAP_PLACEHOLDER = 0x00,
-    DEBUG_LEVEL = 1 // change this in range <0,3> 
+    DEBUG_LEVEL = 0 // change this in range <0,3> 
 };
 
 enum SubstringType
@@ -26,7 +26,7 @@ enum SubstringType
     PREFIX = 0x80,
     INFIX = 0x81,
     POSTFIX = 0x82,
-    ANY_CENTER = 0x83 // made up value for xxx*xxx filters
+    ANY_CENTER = 0x83 // made up value for abc*def filters
 };
 
 enum LDAPPrtotocolOp
@@ -161,14 +161,111 @@ void add_ldap_byte(unsigned char *buff, int *offset, int value);
  */
 void create_ldap_header(unsigned char *buff, int *offset, int messageId);
 
+/**
+ * Get Information for Long Length Encoding.
+ *
+ * Extracts information about the length of data encoded using long length format
+ * and updates the provided LdapElementInfo structure.
+ *
+ * @param data          A pointer to the data containing the LDAP element.
+ * @param elementInfo   A pointer to the LdapElementInfo structure to be updated.
+ * @param lengthValue   The length value indicating long length encoding.
+ */
 void get_long_length_info(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue);
+
+/**
+ * Get LDAP Element Information.
+ *
+ * Extracts information about an LDAP element from the provided data.
+ *
+ * @param data              A pointer to the data containing information for the LDAP element.
+ *
+ * @return                  An LdapElementInfo structure representing information about the LDAP element.
+ *                          The caller is responsible associated memory.
+ */
 LdapElementInfo get_ldap_element_info(unsigned char *data);
+
+/**
+ * Add Integer to Response.
+ *
+ * Adds the provided integer value to the buffer at the specified offset.
+ *
+ * @param buff      A pointer to the buffer where the integer will be added.
+ * @param offset    A pointer to the offset in the buffer where the integer will be added.
+ * @param value     The integer value to add to the buffer.
+ */
 void add_integer(unsigned char *buff, int *offset, int value);
+
+/**
+ * Set Application Type Information in LDAP Element.
+ *
+ * Analyzes the length value of an LDAP element and updates the provided
+ * LdapElementInfo structure.
+ *
+ * @param data          A pointer to the data containing the LDAP element.
+ * @param elementInfo   A pointer to the LdapElementInfo structure to be updated.
+ * @param lengthValue   The length value of the LDAP element.
+ */
 void set_application_type(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue);
+
+/**
+ * Set Universal Type Information in LDAP Element.
+ *
+ * Analyzes the length value of an LDAP element and updates the provided
+ * LdapElementInfo.
+ *
+ * @param data          A pointer to the data containing the LDAP element.
+ * @param elementInfo   A pointer to the LdapElementInfo structure to be updated.
+ * @param lengthValue   The length value of the LDAP element.
+ */
 void set_universal_type(unsigned char *data, LdapElementInfo *elementInfo, int lengthValue);
+
+/**
+ * Add LDAP String to Buffer.
+ *
+ * Adds the provided LDAP string to the buffer at the specified offset.
+ *
+ * @param buff      A pointer to the buffer where the LDAP string will be added.
+ * @param offset    A pointer to the offset in the buffer where the LDAP string will be added.
+ * @param string    A pointer to the LDAP string to add to the buffer.
+ */
 void add_ldap_string(unsigned char *buff, int *offset, char *string);
+
+/**
+ * Add LDAP Object Identifier to Buffer.
+ *
+ * Adds the provided LDAP Object Identifier string to the buffer at the specified offset.
+ *
+ * @param buff      A pointer to the buffer where the LDAP OID will be added.
+ * @param offset    A pointer to the offset in the buffer where the LDAP OID will be added.
+ * @param string    A pointer to the LDAP OID string to add to the buffer.
+ *                  The string is expected to be a valid OID representation.
+ */
 void add_ldap_oid(unsigned char *buff, int *offset, char *string);
 
+/**
+ * LDAP Search Result Done.
+ *
+ * Adds LDAP search result done information to the buffer at the specified offset
+ * and sends it to the specified client socket.
+ *
+ * @param buff          A pointer to the buffer where the LDAP search result done information will be added.
+ * @param offset        A pointer to the offset in the buffer where the information will be added.
+ * @param returnCode    An integer representing the return code for the LDAP search result done.
+ * @param clientSocket  The socket to which the LDAP search result done information will be sent.
+ */
 void ldap_search_res_done(unsigned char *buff, int *offset, int returnCode, int clientSocket);
+
+/**
+ * Debugging Output.
+ *
+ * Outputs debugging information based on the specified level and format string,
+ * similar to the behavior of printf. Variable arguments can be used to include
+ * additional values in the output.
+ *
+ * @param level     The level of the debugging information.
+ * @param format    The format string for the debugging output.
+ * @param ...       Additional variable arguments to be included in the output.
+ */
 void debug(int level, const char *format, ...);
 #endif

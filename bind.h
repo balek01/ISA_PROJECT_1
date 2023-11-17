@@ -31,8 +31,21 @@ enum AuthChoice
     SASL_AUTH = 0xA3
 };
 
-LdapBind
-ldap_bind(unsigned char *data, int messageId);
+/**
+ * LDAP Bind Operation.
+ *
+ * Initiates an LDAP bind operation using the provided data and message ID.
+ *
+ * @param data  A pointer to the data required for the bind operation.
+ * @param messageId An integer representing the unique identifier for the LDAP message.
+ *
+ * @return An LdapBind structure representing the result of the bind operation.
+ *
+ * The caller is responsible for managing any associated memory. 
+ * The 'name' field in the structure is dynamically
+ * allocated and should be freed by the caller when no longer needed.
+ */
+LdapBind ldap_bind(unsigned char *data, int messageId);
 
 /**
  * Send an LDAP Bind response to the client.

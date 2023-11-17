@@ -7,7 +7,6 @@
  * @author xbalek02 Miroslav Bálek
  *
  *
- *  Last modified: Oct 26, 2023
  *
  *
  */
@@ -45,6 +44,12 @@ unsigned char *ldap_receive(int clientSocket, size_t *receivedBytes);
  */
 int ldap_handle_request(unsigned char *data, size_t length, int clientSocket, FILE *file);
 
-void add_ldap_oid(unsigned char *buff, int *offset, char *string);
+/**
+ * LDAP Notice of Disconnection.
+ *
+ * Notifies the application about the disconnection of an LDAP client.
+ *
+ * @param clientSocket  The socket associated with the disconnected LDAP client.
+ */
 void ldap_notice_of_disconnection(int clientSocket);
 #endif
