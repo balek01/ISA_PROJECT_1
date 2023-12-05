@@ -40,12 +40,12 @@ int ldap_handle_request(unsigned char *data, size_t length, int clientSocket, FI
 
     switch (elementInfo.tagValue)
     {
-    case LDAP_BIND_REQUEST:
+    case LDAP_BIND_REQUEST:;
         LdapBind bind = ldap_bind(data, messageId);
         ldap_bind_response(bind, clientSocket);
         break;
 
-    case LDAP_SEARCH_REQUEST:
+    case LDAP_SEARCH_REQUEST:;
         LdapSearch search = ldap_search(data, messageId);
         print_ldap_search(search);
         ldap_search_response(search, clientSocket, file);
